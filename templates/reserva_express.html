@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reserva Express - Walk-in</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card-reserva {
+            max-width: 700px;
+            margin: 40px auto;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        .header-express {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px 15px 0 0;
+        }
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #0056b3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        .habitacion-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            margin: 3px;
+            background: #28a745;
+            color: white;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .grid-habitaciones {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="card card-reserva">
+        <div class="header-express">
+            <h2 class="mb-0">🛎️ Reserva Express</h2>
+            <p class="mb-0 mt-2">Registro rápido para huéspedes sin reserva previa (Walk-in)</p>
+        </div>
+        
+        <div class="card-body p-4">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+            
+            {% if tiene_reserva_futura %}
+            <div class="alert alert-warning" style="border-left: 4px solid #ff9800;">
+                <strong>⚠️ ADVERTENCIA: Esta habitación tiene una reserva futura</strong>
+                <p class="mb-0 mt-2">
+                    La habitación <strong>{{ habitacion_preseleccionada }}</strong> tiene un ingreso programado para <strong>{{ fecha_reserva_futura }}</strong>.
+                    <br>
+                    <small>✓ Puedes vender esta habitación por <strong>1 noche</strong> (checkout mañana a las 10:00 AM)<br>
+                    ✓ La nueva reserva ingresará después de las 14:00 PM</small>
+                </p>
+            </div>
+            {% endif %}
+            
+            <div class="info-box">
+                <strong>ℹ️ Características de la Reserva Express:</strong>
+                <ul class="mb-0 mt-2">
+                    <li>Check-in: <strong>HOY</strong></li>
+                    <li>Check-out: <strong>Según noches seleccionadas</strong></li>
+                    <li>Estadía: <strong>1 o más noches</strong> (límite: reservas futuras)</li>
+                    <li>Se puede cargar consumos inmediatamente</li>
+                    <li>Se procesa checkout en la fecha programada</li>
+                </ul>
+            </div>
+            
+            <div class="mb-3">
+                <h5>🏨 Habitaciones Disponibles ({{ total_disponibles }})</h5>
+                <div class="grid-habitaciones">
+                    {% if habitaciones %}
+                        {% for hab in habitaciones %}
+                        <span class="habitacion-badge">{{ hab }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-danger mb-0">⚠️ No hay habitaciones disponibles</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <form method="POST" action="/reserva-express" class="needs-validation" novalidate>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Habitación *</label>
+                        <select name="habitacion" id="habitacionSelect" class="form-select form-select-lg" required {% if not habitaciones %}disabled{% endif %}>
+                            <option value="">Seleccionar...</option>
+                            {% for hab in habitaciones %}
+                            <option value="{{ hab }}" {% if hab == habitacion_preseleccionada %}selected{% endif %}>Habitación {{ hab }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Cantidad de Personas *</label>
+                        <input type="number" name="pax" class="form-control form-control-lg" 
+                               min="1" max="4" value="1" required>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Cantidad de Noches *</label>
+                        <input type="number" name="noches" id="nochesInput" class="form-control form-control-lg" 
+                               min="1" max="30" value="1" required>
+                        <small id="limiteNoches" class="form-text text-muted"></small>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Fecha de Salida</label>
+                        <input type="text" id="fechaSalida" class="form-control form-control-lg" 
+                               readonly style="background-color: #e9ecef;">
+                        <small class="form-text text-muted">Calculada automáticamente</small>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre del Huésped</label>
+                    <input type="text" name="nombre" class="form-control form-control-lg" 
+                           placeholder="Huésped sin reserva" value="Huésped sin reserva">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Régimen Alimenticio *</label>
+                    <select name="servicios" class="form-select form-select-lg" required>
+                        <option value="DESAYUNO">🍳 Desayuno</option>
+                        <option value="MEDIA PENSION">🍽️ Media Pensión</option>
+                        <option value="ALL INCLUSIVE">⭐ All Inclusive</option>
+                    </select>
+                </div>
+                
+                <hr>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg" 
+                            {% if not habitaciones %}disabled{% endif %}>
+                        ✅ Confirmar Reserva Express
+                    </button>
+                    <a href="/dashboard" class="btn btn-secondary btn-lg">
+                        ❌ Cancelar y Volver
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Validación de formularios Bootstrap
+        (function () {
+            'use strict'
+            var forms = document.querySelectorAll('.needs-validation')
+            Array.prototype.slice.call(forms).forEach(function (form) {
+                form.addEventListener('submit', function (event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                    }
+                    form.classList.add('was-validated')
+                }, false)
+            })
+        })()
+        
+        // Calcular fecha de salida automáticamente
+        const nochesInput = document.getElementById('nochesInput');
+        const fechaSalidaInput = document.getElementById('fechaSalida');
+        const limiteNoches = document.getElementById('limiteNoches');
+        const habitacionSelect = document.getElementById('habitacionSelect');
+        
+        // Datos de límites por habitación (pasados desde el servidor)
+        const limitesHabitaciones = {{ limites_habitaciones|tojson if limites_habitaciones else '{}' }};
+        
+        function actualizarFechaSalida() {
+            const noches = parseInt(nochesInput.value) || 1;
+            const hoy = new Date();
+            const fechaSalida = new Date(hoy);
+            fechaSalida.setDate(fechaSalida.getDate() + noches);
+            
+            const opciones = { year: 'numeric', month: '2-digit', day: '2-digit' };
+            fechaSalidaInput.value = fechaSalida.toLocaleDateString('es-AR', opciones);
+        }
+        
+        function actualizarLimite() {
+            const habitacion = habitacionSelect.value;
+            if (habitacion && limitesHabitaciones[habitacion]) {
+                const limite = limitesHabitaciones[habitacion];
+                limiteNoches.textContent = `⚠️ Máximo ${limite} noche(s) por reserva futura`;
+                limiteNoches.style.color = '#ff9800';
+                nochesInput.max = limite;
+                if (parseInt(nochesInput.value) > limite) {
+                    nochesInput.value = limite;
+                }
+            } else {
+                limiteNoches.textContent = '';
+                nochesInput.max = 30;
+            }
+            actualizarFechaSalida();
+        }
+        
+        nochesInput.addEventListener('input', actualizarFechaSalida);
+        habitacionSelect.addEventListener('change', actualizarLimite);
+        
+        // Inicializar al cargar
+        actualizarLimite();
+    </script>
+</body>
+</html>

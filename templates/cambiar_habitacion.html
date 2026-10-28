@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambio de Habitación {{ habitacion_origen }} - Recepción 2026</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .cambio-container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            max-width: 900px;
+            margin: 40px auto;
+        }
+        
+        .header-cambio {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #ff9800;
+        }
+        
+        .header-cambio h1 {
+            color: #ff9800;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .info-actual {
+            background: #fff3cd;
+            border-left: 4px solid #ff9800;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .habitacion-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .habitacion-badge:hover {
+            transform: scale(1.1);
+        }
+        
+        .habitacion-disponible {
+            background: #d4edda;
+            color: #155724;
+            border: 2px solid #28a745;
+        }
+        
+        .habitacion-seleccionada {
+            background: #0056b3;
+            color: white;
+            border: 2px solid #004085;
+        }
+        
+        .grid-habitaciones {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .alert-motivo {
+            background: #e7f3ff;
+            border-left: 4px solid #0056b3;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="cambio-container">
+        <div class="header-cambio">
+            <h1>🔄 Cambio de Habitación</h1>
+            <p class="text-muted mb-0">Traslado de huésped por desperfecto o emergencia</p>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        
+        <!-- Información actual -->
+        <div class="info-actual">
+            <h5 class="mb-3">📍 Información Actual</h5>
+            <div class="info-row">
+                <span><strong>Habitación actual:</strong></span>
+                <span class="badge bg-warning text-dark" style="font-size: 1.2rem;">{{ habitacion_origen }}</span>
+            </div>
+            <div class="info-row">
+                <span><strong>Huésped:</strong></span>
+                <span>{{ datos_pasajero.pasajero }}</span>
+            </div>
+            <div class="info-row">
+                <span><strong>Check-in / Check-out:</strong></span>
+                <span>{{ datos_pasajero.ingreso }} → {{ datos_pasajero.egreso }}</span>
+            </div>
+            <div class="info-row">
+                <span><strong>Consumos registrados:</strong></span>
+                <span class="badge bg-info">{{ cantidad_consumos }} item(s)</span>
+            </div>
+        </div>
+        
+        <div class="alert-motivo">
+            <strong>ℹ️ Al confirmar el cambio:</strong>
+            <ul class="mb-0 mt-2">
+                <li>El huésped será movido a la nueva habitación</li>
+                <li>Todos sus consumos se trasladarán automáticamente</li>
+                <li>La habitación {{ habitacion_origen }} quedará disponible</li>
+                <li>Las fechas de ingreso/egreso se mantienen</li>
+            </ul>
+        </div>
+        
+        <!-- Formulario de cambio -->
+        <form method="POST" action="/cambiar-habitacion/{{ habitacion_origen }}">
+            <div class="mb-4">
+                <h5 class="mb-3">🏨 Seleccionar Nueva Habitación ({{ total_disponibles }} disponibles)</h5>
+                
+                {% if habitaciones_disponibles %}
+                <div class="grid-habitaciones">
+                    {% for hab in habitaciones_disponibles %}
+                    <label>
+                        <input type="radio" name="habitacion_destino" value="{{ hab }}" 
+                               class="habitacion-radio" required style="display: none;">
+                        <span class="habitacion-badge habitacion-disponible" onclick="seleccionarHabitacion(this)">
+                            {{ hab }}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-danger">
+                    ❌ No hay habitaciones disponibles para realizar el cambio
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label fw-bold">Motivo del Cambio</label>
+                <select name="motivo" class="form-select form-select-lg" required>
+                    <option value="">Seleccionar motivo...</option>
+                    <option value="Aire acondicionado">❄️ Aire acondicionado roto/defectuoso</option>
+                    <option value="Problema de plomería">🚿 Problema de plomería</option>
+                    <option value="Problema eléctrico">⚡ Problema eléctrico</option>
+                    <option value="Ruidos/molestias">🔊 Ruidos o molestias</option>
+                    <option value="Limpieza">🧹 Problema de limpieza</option>
+                    <option value="Solicitud del huésped">👤 Solicitud del huésped</option>
+                    <option value="Otro">🔧 Otro motivo</option>
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label fw-bold">Observaciones adicionales (opcional)</label>
+                <textarea name="observaciones" class="form-control" rows="3" 
+                          placeholder="Detalles adicionales sobre el cambio..."></textarea>
+            </div>
+            
+            <hr>
+            
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-warning btn-lg" 
+                        {% if not habitaciones_disponibles %}disabled{% endif %}
+                        onclick="return confirm('¿Confirmar cambio de habitación {{ habitacion_origen }} → nueva habitación?')">
+                    ✅ Confirmar Cambio de Habitación
+                </button>
+                <a href="/habitacion/{{ habitacion_origen }}" class="btn btn-secondary btn-lg">
+                    ❌ Cancelar y Volver
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function seleccionarHabitacion(elemento) {
+            // Quitar selección de todos
+            document.querySelectorAll('.habitacion-badge').forEach(badge => {
+                badge.classList.remove('habitacion-seleccionada');
+                badge.classList.add('habitacion-disponible');
+            });
+            
+            // Seleccionar el clickeado
+            elemento.classList.remove('habitacion-disponible');
+            elemento.classList.add('habitacion-seleccionada');
+            
+            // Marcar el radio button
+            elemento.previousElementSibling.checked = true;
+        }
+    </script>
+</body>
+</html>

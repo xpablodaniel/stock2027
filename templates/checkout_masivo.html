@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout Masivo - Contingente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .checkout-container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            max-width: 1400px;
+        }
+        
+        .header-checkout {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #dc3545;
+        }
+        
+        .header-checkout h1 {
+            color: #dc3545;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .resumen-general {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-box.danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        
+        .stat-box.success {
+            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .tabla-checkouts {
+            margin-top: 30px;
+            overflow-x: auto;
+        }
+        
+        .tabla-checkouts table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .tabla-checkouts th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+        
+        .tabla-checkouts td {
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .tabla-checkouts tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge-consumo {
+            background: #ffc107;
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .badge-sin-consumo {
+            background: #6c757d;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        
+        .acciones-footer {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .btn-masivo {
+            font-size: 1.2rem;
+            padding: 15px 40px;
+            font-weight: bold;
+            border-radius: 10px;
+        }
+        
+        .alerta-importante {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .alerta-importante h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .alerta-importante ul {
+            margin: 10px 0 0 20px;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="checkout-container">
+        <!-- Header -->
+        <div class="header-checkout">
+            {% if total_habitaciones == 1 %}
+            <h1>🚪 Checkout Pendiente de Habitación</h1>
+            <p class="lead">Resumen de la habitación con checkout pendiente (hoy o vencido)</p>
+            {% else %}
+            <h1>🚪 Checkout Masivo Pendiente - Contingente</h1>
+            <p class="lead">Resumen de habitaciones con checkout pendiente (hoy o vencido)</p>
+            {% endif %}
+        </div>
+
+        <!-- Resumen General -->
+        <div class="resumen-general">
+            <div class="stat-box danger">
+                <div class="stat-number">{{ total_habitaciones }}</div>
+                <div class="stat-label">{% if total_habitaciones == 1 %}Habitación Pendiente{% else %}Habitaciones Pendientes{% endif %}</div>
+            </div>
+            
+            <div class="stat-box {% if total_consumos > 0 %}success{% else %}secondary{% endif %}">
+                <div class="stat-number">${{ "%.2f"|format(total_consumos) }}</div>
+                <div class="stat-label">Total Consumos (Pagados)</div>
+            </div>
+        </div>
+
+        <!-- Alerta Importante -->
+        <div class="alerta-importante">
+            <h4>⚠️ Acción Irreversible</h4>
+            <p><strong>Al confirmar el checkout masivo:</strong></p>
+            <ul>
+                <li>Se eliminarán <strong>{{ total_habitaciones }} pasajeros</strong> del sistema</li>
+                <li>Se eliminarán <strong>todos los consumos</strong> (se consideran pagados)</li>
+                <li>Las habitaciones quedarán <strong>disponibles con saldo en $0</strong></li>
+                <li>Estarán listas para cargar el <strong>nuevo rooming</strong></li>
+            </ul>
+            <p class="mb-0"><strong>Nota:</strong> Las reservas express (individuales) deben procesarse con checkout individual desde el dashboard.</p>
+        </div>
+
+        <!-- Tabla de Checkouts -->
+        <div class="tabla-checkouts">
+            <h3>Detalle de Habitaciones</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Hab.</th>
+                        <th>Pasajero (Titular)</th>
+                        <th>PAX</th>
+                        <th>Voucher</th>
+                        <th>Ingreso</th>
+                        <th>Egreso</th>
+                        <th>Consumos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for checkout in checkouts %}
+                    <tr>
+                        <td><strong>{{ checkout.habitacion }}</strong></td>
+                        <td>{{ checkout.pasajero }}</td>
+                        <td>{{ checkout.plazas }}</td>
+                        <td><span class="badge bg-primary">{{ checkout.voucher }}</span></td>
+                        <td>{{ checkout.ingreso }}</td>
+                        <td><strong>{{ checkout.egreso }}</strong></td>
+                        <td>
+                            {% if checkout.total_consumos > 0 %}
+                                <span class="badge-consumo">${{ "%.2f"|format(checkout.total_consumos) }}</span>
+                            {% else %}
+                                <span class="badge-sin-consumo">Sin consumos</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Acciones -->
+        <div class="acciones-footer">
+            <a href="/dashboard" class="btn btn-secondary btn-lg">
+                ← Volver al Dashboard
+            </a>
+            
+            <form method="POST" action="/checkout-masivo/confirmar" 
+                  onsubmit="return confirm('⚠️ ¿Confirmar checkout de {% if total_habitaciones == 1 %}la habitación{% else %}{{ total_habitaciones }} habitaciones{% endif %}?\n\nEsta acción NO se puede deshacer.');">
+                <button type="submit" class="btn btn-danger btn-masivo">
+                    {% if total_habitaciones == 1 %}
+                    ✅ Confirmar Checkout (1 hab.)
+                    {% else %}
+                    ✅ Confirmar Checkout Masivo ({{ total_habitaciones }} hab.)
+                    {% endif %}
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

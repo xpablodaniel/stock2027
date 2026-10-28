@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=true
+Name=Sistema Recepción Hotel 2026
+Comment=Sistema de Gestión de Consumos y Reservas
+Exec=/home/usuario/recepcion2026-consumos/run_hotel.sh
+Path=/home/usuario/recepcion2026-consumos
+Icon=applications-office
+Categories=Office;Application;
+StartupNotify=true

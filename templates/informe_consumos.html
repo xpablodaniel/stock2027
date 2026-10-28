@@ -1,0 +1,419 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe de Consumos</title>
+
+    <style>
+        :root {
+            --primario: #245b78;
+            --primario-hover: #19445c;
+            --fondo: #f3f6f8;
+            --borde: #dce3e8;
+            --texto: #263746;
+            --secundario: #647482;
+            --blanco: #ffffff;
+            --error-fondo: #fff0f0;
+            --error-texto: #a52b2b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            background: var(--fondo);
+            color: var(--texto);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .contenedor {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .encabezado {
+            margin-bottom: 24px;
+        }
+
+        .encabezado h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        .encabezado p {
+            margin: 0;
+            color: var(--secundario);
+            line-height: 1.5;
+        }
+
+        .panel {
+            margin-bottom: 24px;
+            padding: 24px;
+            background: var(--blanco);
+            border: 1px solid var(--borde);
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgb(0 0 0 / 4%);
+        }
+
+        .filtros {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+            align-items: end;
+            gap: 16px;
+        }
+
+        .campo {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .campo label {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .campo input {
+            width: 100%;
+            min-height: 42px;
+            padding: 9px 10px;
+            border: 1px solid #bdc9d2;
+            border-radius: 6px;
+            font: inherit;
+        }
+
+        button,
+        .boton {
+            display: inline-flex;
+            min-height: 42px;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 18px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--primario);
+            color: var(--blanco);
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        button:hover,
+        .boton:hover {
+            background: var(--primario-hover);
+        }
+
+        .acciones {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .boton-secundario {
+            background: #e7edf1;
+            color: var(--texto);
+        }
+
+        .boton-secundario:hover {
+            background: #d7e0e6;
+        }
+
+        .resumen {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .indicador {
+            padding: 20px;
+            border: 1px solid var(--borde);
+            border-radius: 10px;
+            background: #f9fbfc;
+        }
+
+        .indicador span {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--secundario);
+            font-size: 14px;
+        }
+
+        .indicador strong {
+            font-size: 25px;
+            overflow-wrap: anywhere;
+        }
+
+        .tabla-contenedor {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #eaf0f4;
+        }
+
+        th,
+        td {
+            padding: 13px 15px;
+            border-bottom: 1px solid var(--borde);
+            text-align: left;
+        }
+
+        th {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        td.numero,
+        th.numero {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover {
+            background: #f7fafb;
+        }
+
+        tfoot {
+            background: #f0f5f8;
+            font-weight: bold;
+        }
+
+        .mensaje {
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            border-radius: 7px;
+            line-height: 1.5;
+        }
+
+        .mensaje-error {
+            background: var(--error-fondo);
+            color: var(--error-texto);
+            border: 1px solid #f1caca;
+        }
+
+        .mensaje-vacio {
+            padding: 28px 16px;
+            color: var(--secundario);
+            text-align: center;
+        }
+
+        .volver {
+            display: inline-block;
+            margin-top: 4px;
+            color: var(--primario);
+            text-decoration: none;
+        }
+
+        .volver:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 14px;
+            }
+
+            .panel {
+                padding: 16px;
+            }
+
+            .filtros {
+                grid-template-columns: 1fr;
+            }
+
+            .resumen {
+                grid-template-columns: 1fr;
+            }
+
+            .encabezado h1 {
+                font-size: 24px;
+            }
+
+            .acciones button,
+            .acciones .boton {
+                width: 100%;
+            }
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+
+            .filtros-panel,
+            .acciones,
+            .volver {
+                display: none !important;
+            }
+
+            .panel {
+                padding: 10px 0;
+                border: 0;
+                box-shadow: none;
+            }
+
+            .indicador {
+                break-inside: avoid;
+            }
+
+            table {
+                font-size: 11px;
+            }
+
+            th,
+            td {
+                padding: 7px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="contenedor">
+        <header class="encabezado">
+            <h1>Informe consolidado de consumos</h1>
+            <p>
+                Resumen de productos consumidos durante el período seleccionado.
+                Se excluyen los consumos anulados, la estadía y MAP.
+            </p>
+        </header>
+
+        <section class="panel filtros-panel">
+            <form method="POST" action="{{ url_for('informe_consumos') }}">
+                <div class="filtros">
+                    <div class="campo">
+                        <label for="fecha_desde">Fecha desde</label>
+                        <input
+                            type="date"
+                            id="fecha_desde"
+                            name="fecha_desde"
+                            value="{{ fecha_desde }}"
+                            required
+                        >
+                    </div>
+
+                    <div class="campo">
+                        <label for="fecha_hasta">Fecha hasta</label>
+                        <input
+                            type="date"
+                            id="fecha_hasta"
+                            name="fecha_hasta"
+                            value="{{ fecha_hasta }}"
+                            required
+                        >
+                    </div>
+
+                    <button type="submit">Consultar informe</button>
+                </div>
+            </form>
+        </section>
+
+            <form method="POST" action="{{ url_for('exportar_informe_consumos_xlsx') }}" class="mt-3">
+                <input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">
+                <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">
+                <button type="submit" class="btn btn-success">
+                    📥 Descargar informe Excel
+                </button>
+            </form>
+
+        {% if error %}
+            <div class="mensaje mensaje-error" role="alert">
+                <strong>No se pudo generar el informe.</strong>
+                {{ error }}
+            </div>
+        {% endif %}
+
+        {% if resultado is not none %}
+            <section class="panel">
+                <div class="acciones">
+                    <button type="button" onclick="window.print()">
+                        Imprimir informe
+                    </button>
+                </div>
+
+                <div class="resumen">
+                    <div class="indicador">
+                        <span>Total de unidades consumidas</span>
+                        <strong>
+                            {{ "{:,.2f}".format(resultado.total_unidades).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                        </strong>
+                    </div>
+
+                    <div class="indicador">
+                        <span>Importe total registrado</span>
+                        <strong>
+                            $ {{ "{:,.2f}".format(resultado.total_importe).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                        </strong>
+                    </div>
+                </div>
+
+                <h2>Detalle por producto</h2>
+
+                {% if resultado.detalle.empty %}
+                    <div class="mensaje-vacio">
+                        No se encontraron consumos de productos para el período seleccionado.
+                    </div>
+                {% else %}
+                    <div class="tabla-contenedor">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="numero">Unidades</th>
+                                    <th class="numero">Importe total</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for fila in resultado.detalle.to_dict(orient='records') %}
+                                    <tr>
+                                        <td>{{ fila['Producto'] }}</td>
+                                        <td class="numero">
+                                            {{ "{:,.2f}".format(fila['Unidades']).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                                        </td>
+                                        <td class="numero">
+                                            $ {{ "{:,.2f}".format(fila['Importe total']).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+
+                            <tfoot>
+                                <tr>
+                                    <td>Total general</td>
+                                    <td class="numero">
+                                        {{ "{:,.2f}".format(resultado.total_unidades).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                                    </td>
+                                    <td class="numero">
+                                        $ {{ "{:,.2f}".format(resultado.total_importe).replace(",", "X").replace(".", ",").replace("X", ".") }}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        <a class="volver" href="{{ url_for('index') }}">
+            ← Volver al panel principal
+        </a>
+    </main>
+</body>
+</html>

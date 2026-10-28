@@ -1,0 +1,128 @@
+# 🛎️ Reserva Express (Walk‑ins)
+La funcionalidad **Reserva Express** permite registrar huéspedes que llegan sin reserva previa y se alojan por una noche.  
+Este tipo de estadía es común en mostrador y debe quedar registrada para que el módulo de consumos pueda:
+
+- asociar consumos a la habitación,
+- mostrar al huésped en el dashboard,
+- permitir checkout al día siguiente,
+- mantener un historial real de ocupación.
+
+Esta implementación convierte al sistema en un PMS más completo, permitiendo manejar tanto reservas anticipadas como huéspedes espontáneos.
+
+---
+
+## ✅ IMPLEMENTACIONES RECIENTES (17/01/2026)
+
+### 1. Reorganización de Botones en Dashboard
+- ✅ Movido botón "Consulta de Consumos" desde posición flotante al header
+- ✅ Ahora está junto con los botones de gestión principales
+- ✅ Mejora la experiencia de usuario y accesibilidad
+
+### 2. Checkout Anticipado
+- ✅ Implementado sistema de checkout para retiros anticipados
+- ✅ Banner amarillo en ficha de habitación para procesar retiros antes de fecha programada
+- ✅ Confirmación adicional para evitar checkouts accidentales
+- ✅ Casos de uso: emergencias personales, problemas urgentes, cambios de plan
+- ✅ Template de checkout diferencia entre checkout normal y anticipado
+- ✅ Documentación actualizada en README.md
+
+---
+
+## 🎯 Contexto del Proyecto
+
+### Flujo Operativo en Temporada Alta
+- Reservas masivas procesadas por 4-5 días continuos
+- Hotel completo al 90% con contingentes
+- Habitaciones libres gestionadas como Walk-ins (1-2 días)
+- Todos ingresan y se van el mismo día (contingentes)
+- Retiros anticipados por urgencias personales o problemas
+
+### Decisión de Arquitectura
+- **Repositorio actual (recepcion2026-consumos)**: Sistema operativo diario (Dashboard + Consumos + Reservas Express)
+- **Repositorio anterior (recepcion2026-reservas)**: Procesamiento batch obsoleto (Excel + openpyxl)
+- **Estrategia**: Mantener separados, priorizar dashboard actual que maneja tanto reservas como consumos
+
+---
+
+## 🎯 Objetivo
+Crear una reserva mínima con los datos esenciales:
+
+- Habitación  
+- Nombre del huésped (opcional)  
+- Cantidad de pasajeros  
+- Fecha de entrada: **hoy**  
+- Fecha de salida: **mañana**  
+- Origen: `"walk-in"`
+
+La reserva se guarda en `data/reservas.csv` para que otros módulos puedan consumirla.
+
+---
+
+## 🧩 Flujo de uso
+1. Un huésped llega sin reserva.  
+2. El recepcionista asigna una habitación disponible.  
+3. Se ejecuta la función `crear_reserva_express`.  
+4. La reserva queda registrada automáticamente.  
+5. El módulo de consumos puede cargar consumos a esa habitación sin errores.  
+
+---
+
+## 🐍 Código Python sugerido
+
+```python
+from datetime import date, timedelta
+import csv
+import os
+
+def crear_reserva_express(habitacion, nombre="Huésped sin reserva", pax=1):
+    """
+    Crea una reserva mínima para huéspedes que llegan sin reserva previa (walk-ins).
+    La reserva se registra para la fecha actual y una noche de estadía.
+    """
+
+    hoy = date.today()
+    manana = hoy + timedelta(days=1)
+
+    nueva_reserva = {
+        "habitacion": habitacion,
+        "nombre": nombre,
+        "pax": pax,
+        "checkin": hoy.isoformat(),
+        "checkout": manana.isoformat(),
+        "origen": "walk-in"
+    }
+
+    # Asegurar que el archivo existe y tiene encabezados
+    ruta = "data/reservas.csv"
+    archivo_existe = os.path.exists(ruta)
+
+    with open(ruta, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=nueva_reserva.keys())
+
+        if not archivo_existe:
+            writer.writeheader()
+
+        writer.writerow(nueva_reserva)
+
+    return nueva_reserva
+---
+🔗 Integración con otros módulos
+Con recepcion2026-consumos
+Cuando se intenta cargar un consumo a una habitación sin estadía activa:
+
+El sistema puede detectar que no existe reserva.
+
+Preguntar si se desea crear una Reserva Express.
+
+Llamar a crear_reserva_express.
+
+Continuar con la carga del consumo sin interrupciones.
+
+🚀 Próximos pasos
+Integrar esta función en un módulo core/reserva_express.py.
+
+Crear un validador de disponibilidad simple.
+
+Preparar la migración a SQLite para manejar walk‑ins como registros reales de estadía.
+
+Conectar reservas y consumos mediante un ID único de estadía.

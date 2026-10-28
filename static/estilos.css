@@ -1,0 +1,202 @@
+/* Estilos generales del sistema *//* Estilos globales del sistema de recepción *//* Estilos generales del sistema */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    color: white;    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);.card-header {}    color: white;    background-color: #fd7e14;.hab-ocupada-con-consumos {}    border: none;    color: white;    background-color: #28a745;.hab-ocupada-sin-consumos {}    cursor: not-allowed;    color: white;    background-color: #6c757d;.hab-vacia {}    box-shadow: 0 4px 8px rgba(0,0,0,0.2);    transform: translateY(-2px);.habitacion-btn:hover {}    transition: all 0.3s ease;    margin: 5px 0;    border-radius: 10px;    font-weight: bold;    font-size: 1.2rem;    height: 80px;    width: 100%;.habitacion-btn {}    box-shadow: 0 4px 6px rgba(0,0,0,0.1);    margin-bottom: 30px;    padding: 25px;    border-radius: 15px;    background: white;.piso-seccion {/* Estilos para el dashboard de habitaciones */}    margin: 0 auto;    max-width: 1400px;.dashboard-container {}    padding: 20px;    min-height: 100vh;    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;body {}    --color-gris: #6c757d;    --color-peligro: #dc3545;    --color-alerta: #ffc107;    --color-secundario: #28a745;    --color-primario: #0056b3;:root {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}    transition: all 0.3s;    transform: scale(1.05);    opacity: 0.8;.btn:hover {}    border: none;    color: white;    background-color: #fd7e14;.btn-habitacion-consumos {}    color: white;    border-color: #28a745;    background-color: #28a745;.btn-habitacion-ocupada {}    color: white;    border-color: #6c757d;    background-color: #6c757d;.btn-habitacion-vacia {}    transition: all 0.3s ease;    border-radius: 8px;    font-size: 1.1rem;    font-weight: bold;    height: 60px;    width: 100%;.btn-habitacion {}    margin-bottom: 30px;    gap: 10px;    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));    display: grid;.habitacion-grid {}    font-size: 1.3rem;    margin-bottom: 15px;    color: #0056b3;    font-weight: bold;.piso-titulo {}    box-shadow: 0 2px 4px rgba(0,0,0,0.1);    border-radius: 10px;    padding: 20px;    background: white;    margin-bottom: 30px;.piso-section {}    padding: 20px;.dashboard-container {/* Dashboard de habitaciones */}    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);.navbar {}    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;    background-color: #f4f6f9;body {body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Dashboard de habitaciones */
+.dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.piso-section {
+    margin-bottom: 40px;
+}
+
+.piso-titulo {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 10px 10px 0 0;
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.habitaciones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    margin-bottom: 30px;
+}
+
+.habitacion-btn {
+    min-height: 80px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.habitacion-vacia {
+    background-color: #6c757d;
+    border-color: #5a6268;
+    color: white;
+    cursor: not-allowed;
+}
+
+.habitacion-ocupada {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.habitacion-con-consumos {
+    background-color: #fd7e14;
+    border-color: #fd7e14;
+    color: white;
+}
+
+.btn-habitacion {
+    width: 100%;
+    height: 80px;
+    font-size: 1.2rem;
+    font-weight: bold;
+}

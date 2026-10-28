@@ -1,0 +1,112 @@
+╔════════════════════════════════════════════════════════════════════╗
+║       CASOS DE PRUEBA - CONSUMOS INDIVIDUALES (JUBILADOS)         ║
+╚════════════════════════════════════════════════════════════════════╝
+
+📅 FECHAS DE LA RESERVA
+   - Check-in:  02/03/2026 (HOY es 01/03/2026, ingresan MAÑANA)
+   - Check-out: 06/03/2026
+
+📊 DATOS CARGADOS
+   - Total de pasajeros: 44
+   - Habitaciones ocupadas: 34
+   - Archivo de consumos: LIMPIO (listo para pruebas)
+
+═══════════════════════════════════════════════════════════════════
+
+🎯 CASOS DE PRUEBA PARA CONSUMOS SEPARADOS
+
+┌─ HABITACIÓN 101 ─────────────────────────────────────────────────┐
+│  👤 Guion Cecilia (64 años)                                       │
+│     Voucher: 30188715                                             │
+│                                                                   │
+│  👤 LOPEZ ERIQUE ALICIA ISABEL (58 años)                         │
+│     Voucher: 30188714                                             │
+│                                                                   │
+│  ⚠️  VOUCHERS DIFERENTES - Consumos se cargan POR SEPARADO       │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ HABITACIÓN 103 ─────────────────────────────────────────────────┐
+│  👤 GEDEON GUILLERMO JOSE (69 años)                              │
+│     Voucher: 30188727                                             │
+│                                                                   │
+│  👤 MONFORT OMAR ALEJANDRO (65 años)                             │
+│     Voucher: 30188729                                             │
+│                                                                   │
+│  ⚠️  VOUCHERS DIFERENTES - Consumos se cargan POR SEPARADO       │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ HABITACIÓN 104 ─────────────────────────────────────────────────┐
+│  👤 TERESA DE JESUS ALDANA (87 años)                             │
+│     Voucher: 30188726                                             │
+│                                                                   │
+│  👤 SCHLAFMAN MARTHA BEATRIZ (80 años)                           │
+│     Voucher: 30188727                                             │
+│                                                                   │
+│  ⚠️  VOUCHERS DIFERENTES - Consumos se cargan POR SEPARADO       │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ HABITACIÓN 105 ─────────────────────────────────────────────────┐
+│  👤 MATALONI ANA MARIA (65 años)                                 │
+│     Voucher: 30188730                                             │
+│                                                                   │
+│  👤 ROSARIA ABATE (79 años)                                      │
+│     Voucher: 30188731                                             │
+│                                                                   │
+│  ⚠️  VOUCHERS DIFERENTES - Consumos se cargan POR SEPARADO       │
+└───────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+
+🎯 CASOS DE PRUEBA PARA CONSUMOS UNIFICADOS (Matrimonio/Familia)
+
+┌─ HABITACIÓN 102 ─────────────────────────────────────────────────┐
+│  👤 OCAMPOS GRACIELA CRISTINA (65 años) - TITULAR               │
+│  👤 VARELA RAUL (66 años)                                        │
+│     Voucher compartido: 30188721                                  │
+│                                                                   │
+│  ✅ MISMO VOUCHER - Consumos unificados (matrimonio presumible)  │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ HABITACIÓN 106 ─────────────────────────────────────────────────┐
+│  👤 DE BIAGGI KARIN (59 años) - TITULAR                          │
+│  👤 SORRENTINO JOSE LUIS (60 años)                               │
+│     Voucher compartido: 30188734                                  │
+│                                                                   │
+│  ✅ MISMO VOUCHER - Consumos unificados (matrimonio presumible)  │
+└───────────────────────────────────────────────────────────────────┘
+
+┌─ HABITACIÓN 109 ─────────────────────────────────────────────────┐
+│  👤 MAZZEI GABRIELA MARIA (64 años) - TITULAR                    │
+│  👤 ALVAREZ GONZALEZ ROBERTO (70 años)                           │
+│     Voucher compartido: 30188736                                  │
+│                                                                   │
+│  ✅ MISMO VOUCHER - Consumos unificados (matrimonio presumible)  │
+└───────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+
+🧪 INSTRUCCIONES PARA PROBAR
+
+1. Iniciar el servidor Flask
+2. Ir al dashboard (http://127.0.0.1:5000/dashboard)
+3. Las habitaciones aparecerán como RESERVADAS (ingresan mañana 02/03)
+4. Para simular que ya ingresaron, puedes:
+   - Cambiar la fecha del sistema a 02/03/2026, o
+   - Modificar las fechas en el CSV a 01/03/2026
+
+PRUEBAS RECOMENDADAS:
+
+📋 HAB 101 (Vouchers diferentes):
+   - Agregar consumo de $1500 a "Guion Cecilia"
+   - Agregar consumo de $800 a "LOPEZ ERIQUE ALICIA ISABEL"
+   - Verificar que se muestren separados con subtotales
+
+📋 HAB 102 (Voucher compartido):
+   - Agregar consumo de $2000 (puede ir a cualquiera)
+   - Verificar que se muestre un solo total unificado
+
+📋 Checkout HAB 101:
+   - Verificar que se muestren los totales separados por pasajero
+   - Confirmar checkout y validar que la habitación queda libre
+
+═══════════════════════════════════════════════════════════════════

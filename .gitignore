@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Archivos de datos sensibles - NO subir al repositorio
+data/*.csv
+data/backups/
+data/cierres/*.csv
+data/cierres/*.xlsx
+*.xlsx
+
+# Excepto archivos de ejemplo/plantilla
+!data/*_ejemplo.csv
+!data/README.md
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Respaldo del repositorio anterior: conservar fuera de GitHub
+legacy-respaldo.bundle
+legacy-respaldo.bundle.*
+
+# Datos operativos locales
+data/*.csv
+data/backups/
+data/cierres/
+
+# Archivos locales de prueba en la raíz
+/pruebaGroup.csv
+/reservaIndividual.csv
+
+# Entornos y configuraciones locales
+.env
+.env.*
+!.env.example
+
+# Catálogo local: cada instalación debe aportar su propio catálogo
+/data/catalogo_productos.csv
+
+# Repositorio anterior: mantenerlo local y separado
+/legacy/

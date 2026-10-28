@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionar Pasajeros - Recepción 2026</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .scenario-card {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .scenario-card:hover {
+            transform: translateY(-5px);
+        }
+        .active-scenario {
+            border: 3px solid #28a745;
+            background-color: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <!-- Header -->
+                <div class="card p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h2>📂 Gestión de Pasajeros</h2>
+                        <a href="/dashboard" class="btn btn-primary">🏨 Volver al Dashboard</a>
+                    </div>
+                    <p class="text-muted mb-0">Selecciona el escenario de temporada para cargar en el sistema</p>
+                </div>
+
+                <!-- Mensajes Flash -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, message in messages %}
+                      <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+
+                <!-- Archivo Actual -->
+                <div class="card p-4 mb-4 {{ 'active-scenario' if info_actual else '' }}">
+                    <h4>📊 Archivo Actualmente Cargado</h4>
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <strong>Total de pasajeros:</strong><br>
+                            <span class="fs-3 text-primary">{{ info_actual.total }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Habitaciones ocupadas:</strong><br>
+                            <span class="fs-3 text-success">{{ info_actual.habitaciones|length }}</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Check-outs hoy:</strong><br>
+                            <span class="fs-3 text-danger">{{ info_actual.checkouts_hoy }}</span>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Rango de ingresos:</strong> {{ info_actual.fecha_ingreso_min }} - {{ info_actual.fecha_ingreso_max }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Rango de egresos:</strong> {{ info_actual.fecha_egreso_min }} - {{ info_actual.fecha_egreso_max }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subir Archivo Personalizado -->
+                <div class="card p-4 mt-4">
+                    <h5>📤 Cargar Archivo de Pasajeros</h5>
+                    <p class="text-muted">Carga un archivo CSV con las reservas desde tu sistema externo</p>
+                    <form method="POST" action="/subir-pasajeros" enctype="multipart/form-data">
+                        <!-- Selector de Modo de Carga -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Modo de Carga:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="modo_carga" value="agregar" id="modo_agregar" checked>
+                                <label class="form-check-label" for="modo_agregar">
+                                    <strong>➕ Agregar/Actualizar</strong> - Mantiene reservas existentes y agrega las nuevas
+                                    <br><small class="text-muted">Ideal después de checkout masivo para cargar nuevo contingente</small>
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="radio" name="modo_carga" value="reemplazar" id="modo_reemplazar">
+                                <label class="form-check-label" for="modo_reemplazar">
+                                    <strong>🔄 Reemplazar Todo</strong> - Borra todas las reservas y carga desde cero
+                                    <br><small class="text-muted">⚠️ Elimina TODAS las reservas actuales y consumos</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-9">
+                                <input type="file" name="archivo" class="form-control" accept=".csv" required>
+                                <small class="text-muted">Formato: CSV con columnas estándar de pasajeros</small>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-success w-100">
+                                    ⬆️ Cargar Archivo
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

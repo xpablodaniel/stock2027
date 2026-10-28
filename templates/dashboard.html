@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Recepción 2026</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .dashboard-header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .estadisticas {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            border-left: 4px solid #0056b3;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #0056b3;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        
+        .piso-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .piso-titulo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 3px solid #0056b3;
+            padding-bottom: 10px;
+        }
+        
+        .habitaciones-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .habitacion-card {
+            aspect-ratio: 1;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .habitacion-card:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        
+        .habitacion-vacia {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            border: 2px dashed #adb5bd;
+            color: #6c757d;
+        }
+        
+        .habitacion-reservada {
+            background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%);
+            border: 2px solid #0d6efd;
+            color: #084298;
+        }
+        
+        .habitacion-ocupada {
+            background: linear-gradient(135deg, #d4edda 0%, #a3d9a5 100%);
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+        
+        .habitacion-con-consumos {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffc107 100%);
+            border: 2px solid #ff9800;
+            color: #856404;
+        }
+        
+        .habitacion-checkout {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border: 3px solid #dc3545;
+            color: #721c24;
+            animation: pulse-checkout 2s infinite;
+        }
+        
+        @keyframes pulse-checkout {
+            0%, 100% { box-shadow: 0 0 10px rgba(220, 53, 69, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(220, 53, 69, 0.8); }
+        }
+        
+        .badge-checkout {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #dc3545;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+        
+        .habitacion-numero {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .habitacion-info {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+        
+        .habitacion-pasajero {
+            font-size: 0.7rem;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        .leyenda {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .leyenda-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .leyenda-color {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .habitaciones-grid {
+                grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+                gap: 10px;
+            }
+            
+            .habitacion-numero {
+                font-size: 1.3rem;
+            }
+            
+            .habitacion-pasajero {
+                font-size: 0.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header con estadísticas -->
+        <div class="dashboard-header">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="mb-0">🏨 Tablero de Habitaciones</h1>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="/bebidas-rapidas" class="btn btn-warning btn-lg">
+                        🥤 Bebidas Rápidas
+                    </a>
+                    <a href="/reserva-express" class="btn btn-success btn-lg">
+                        🛎️ Reserva Express
+                    </a>
+                    <a href="/gestionar-pasajeros" class="btn btn-outline-primary btn-lg">
+                        📂 Gestionar Pasajeros
+                    </a>
+                    <a href="/ver-consumos" class="btn btn-outline-secondary btn-lg">
+                        📋 Consulta de Consumos
+                    </a>
+
+                    <a href="/informe-consumos" class="btn btn-primary btn-lg">
+                        📊 Informe de Consumos
+                    </a>
+
+                    {% if estadisticas.checkouts_pendientes > 0 %}
+                    <a href="/checkout-masivo" class="btn btn-danger btn-lg" style="animation: pulse-checkout 2s infinite;">
+                        {% if estadisticas.checkouts_pendientes == 1 %}
+                        🚪 Procesar Checkout Pendiente (1 hab.)
+                        {% else %}
+                        🚪 Checkout Masivo Pendiente ({{ estadisticas.checkouts_pendientes }} hab.)
+                        {% endif %}
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="estadisticas">
+                <div class="stat-card">
+                    <div class="stat-number">{{ estadisticas.total }}</div>
+                    <div class="stat-label">Total Habitaciones</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #28a745;">
+                    <div class="stat-number" style="color: #28a745;">{{ estadisticas.ocupadas }}</div>
+                    <div class="stat-label">Ocupadas</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #ffc107;">
+                    <div class="stat-number" style="color: #ffc107;">{{ estadisticas.con_consumos }}</div>
+                    <div class="stat-label">Con Consumos</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #0d6efd;">
+                    <div class="stat-number" style="color: #0d6efd;">{{ estadisticas.reservadas }}</div>
+                    <div class="stat-label">Reservas Futuras</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #6c757d;">
+                    <div class="stat-number" style="color: #6c757d;">{{ estadisticas.vacias }}</div>
+                    <div class="stat-label">Disponibles</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #dc3545;">
+                    <div class="stat-number" style="color: #dc3545;">{{ estadisticas.checkouts_pendientes }}</div>
+                    <div class="stat-label">Check-outs Pendientes</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grilla por pisos -->
+        {% for piso, habitaciones in pisos.items() %}
+        <div class="piso-container">
+            <div class="piso-titulo">
+                📍 Piso {{ piso }} - {{ habitaciones|length }} habitaciones
+            </div>
+            
+            <div class="habitaciones-grid">
+                {% for num_hab in habitaciones %}
+                    {% set estado = estados[num_hab] %}
+                    {% set clase_estado = 'habitacion-' + estado|replace('_', '-') %}
+                    {% set es_checkout = num_hab in checkouts_hoy %}
+                    
+                    <a href="{% if estado == 'vacia' %}/reserva-express?habitacion={{ num_hab }}{% elif estado == 'reservada' %}/reserva-express?habitacion={{ num_hab }}&reserva_futura=1{% else %}/habitacion/{{ num_hab }}{% endif %}" 
+                       class="habitacion-card {{ clase_estado }}">
+                        {% if es_checkout %}
+                            <span class="badge-checkout">✓</span>
+                        {% endif %}
+                        <div class="habitacion-numero">{{ num_hab }}</div>
+                        
+                        {% if estado == 'vacia' %}
+                            <div class="habitacion-info">✨ Disponible</div>
+                            <div class="habitacion-pasajero" style="font-size: 0.65rem;">Click para Check-in</div>
+                        {% elif estado == 'reservada' %}
+                            <div class="habitacion-info">{{ reservadas[num_hab].plazas }} PAX • 📅 Reserva</div>
+                            <div class="habitacion-pasajero" style="font-size: 0.7rem;">Ingreso: {{ reservadas[num_hab].ingreso }}</div>
+                            <div class="habitacion-pasajero" style="font-size: 0.6rem; margin-top: 3px; color: #084298; font-weight: 600;">⚡ Click para Express</div>
+                        {% elif estado == 'checkout' %}
+                            <div class="habitacion-info">{{ ocupadas[num_hab].plazas }} PAX • 🚪 CHECK-OUT</div>
+                            <div class="habitacion-pasajero">{{ ocupadas[num_hab].pasajero }}</div>
+                        {% elif estado == 'ocupada' %}
+                            <div class="habitacion-info">{{ ocupadas[num_hab].plazas }} PAX</div>
+                            <div class="habitacion-pasajero">{{ ocupadas[num_hab].pasajero }}</div>
+                        {% elif estado == 'con_consumos' %}
+                            <div class="habitacion-info">{{ ocupadas[num_hab].plazas }} PAX • 💰</div>
+                            <div class="habitacion-pasajero">{{ ocupadas[num_hab].pasajero }}</div>
+                        {% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Leyenda -->
+        <div class="leyenda">
+            <div class="leyenda-item">
+                <div class="leyenda-color" style="background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%); border: 2px dashed #adb5bd;"></div>
+                <span>Disponible</span>
+            </div>
+            <div class="leyenda-item">
+                <div class="leyenda-color" style="background: linear-gradient(135deg, #cfe2ff 0%, #9ec5fe 100%); border: 2px solid #0d6efd;"></div>
+                <span>📅 Reserva Futura</span>
+            </div>
+            <div class="leyenda-item">
+                <div class="leyenda-color" style="background: linear-gradient(135deg, #d4edda 0%, #a3d9a5 100%); border: 2px solid #28a745;"></div>
+                <span>Ocupada sin consumos</span>
+            </div>
+            <div class="leyenda-item">
+                <div class="leyenda-color" style="background: linear-gradient(135deg, #fff3cd 0%, #ffc107 100%); border: 2px solid #ff9800;"></div>
+                <span>Ocupada con consumos</span>
+            </div>
+            <div class="leyenda-item">
+                <div class="leyenda-color" style="background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border: 3px solid #dc3545;"></div>
+                <span>🚪 Check-out HOY</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

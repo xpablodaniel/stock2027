@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carga Rápida de Bebidas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header-box, .room-card, .legend-box {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.15);
+        }
+        .header-box {
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .legend-box {
+            padding: 18px;
+            margin-bottom: 24px;
+        }
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+        .legend-item {
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 12px;
+            background: #f8f9fa;
+        }
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 18px;
+        }
+        .room-card {
+            padding: 18px;
+        }
+        .room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            border-bottom: 2px solid #eef2f7;
+            padding-bottom: 10px;
+        }
+        .passenger-form {
+            border: 1px solid #eef2f7;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background: #fcfdff;
+        }
+        .quick-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .quick-product,
+        .quick-qty {
+            border-radius: 10px;
+        }
+        .quick-product.selected,
+        .quick-qty.selected {
+            background: #dbeafe;
+            border-color: #0d6efd;
+            color: #0d6efd;
+            box-shadow: inset 0 0 0 1px #0d6efd;
+        }
+        .resume-line {
+            margin-top: 10px;
+            background: #fff8e1;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header-box d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h1 class="mb-1">Carga Rápida de Bebidas</h1>
+                <p class="text-muted mb-0">Pantalla pensada para servicios masivos. Cada pasajero tiene su propia botonera rápida.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="/dashboard" class="btn btn-outline-secondary btn-lg">Volver al Dashboard</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="legend-box">
+            <h5 class="mb-3">Precios configurados</h5>
+            <div class="legend-grid">
+                {% for bebida in catalogo_bebidas %}
+                <div class="legend-item">
+                    <div><strong>{{ bebida.icono }} {{ bebida.nombre }}</strong></div>
+                    <div class="text-muted small">
+                        {% if bebida.habilitado %}
+                        ${{ "%.0f"|format(bebida.precio) }} por unidad
+                        {% else %}
+                        Precio pendiente de configurar
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="rooms-grid">
+            {% for habitacion in habitaciones %}
+            <div class="room-card">
+                <div class="room-header">
+                    <div>
+                        <h4 class="mb-0">Hab. {{ habitacion.numero }}</h4>
+                        <small class="text-muted">Titular: {{ habitacion.titular }}</small>
+                    </div>
+                    <a href="/habitacion/{{ habitacion.numero }}" class="btn btn-sm btn-outline-primary">Abrir ficha</a>
+                </div>
+
+                {% for pasajero in habitacion.pasajeros %}
+                <form class="passenger-form bebida-masiva-form" method="POST" action="/bebidas-rapidas">
+                    <input type="hidden" name="habitacion" value="{{ habitacion.numero }}">
+                    <input type="hidden" name="pasajero" value="{{ pasajero.nombre }}">
+                    <input type="hidden" name="producto" class="producto-input">
+                    <input type="hidden" name="cantidad" class="cantidad-input" value="{{ cantidades_rapidas[0] if cantidades_rapidas else 1 }}">
+
+                    <div class="mb-2">
+                        <strong>{{ pasajero.nombre }}</strong>
+                        {% if pasajero.edad %}<span class="text-muted small"> · {{ pasajero.edad }} años</span>{% endif %}
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="small fw-bold mb-1">Bebida</div>
+                        <div class="quick-buttons">
+                            {% for bebida in catalogo_bebidas %}
+                            <button type="button"
+                                    class="btn btn-outline-primary btn-sm quick-product {% if not bebida.habilitado %}disabled{% endif %}"
+                                    data-producto="{{ bebida.codigo }}"
+                                    data-nombre="{{ bebida.nombre }}"
+                                    data-precio="{{ bebida.precio if bebida.precio is not none else '' }}"
+                                    {% if not bebida.habilitado %}disabled{% endif %}>
+                                {{ bebida.icono }} {{ bebida.nombre }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <div class="small fw-bold mb-1">Cantidad</div>
+                        <div class="quick-buttons">
+                            {% for cantidad in cantidades_rapidas %}
+                            <button type="button" class="btn btn-outline-secondary btn-sm quick-qty {% if loop.first %}selected{% endif %}" data-cantidad="{{ cantidad }}">x{{ cantidad }}</button>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="resume-line">Seleccione bebida para calcular el total.</div>
+                    <button type="submit" class="btn btn-success w-100 mt-2 submit-btn" disabled>Agregar bebida</button>
+                </form>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.querySelectorAll('.bebida-masiva-form').forEach((form) => {
+            const productButtons = form.querySelectorAll('.quick-product');
+            const qtyButtons = form.querySelectorAll('.quick-qty');
+            const productInput = form.querySelector('.producto-input');
+            const qtyInput = form.querySelector('.cantidad-input');
+            const resumeLine = form.querySelector('.resume-line');
+            const submitBtn = form.querySelector('.submit-btn');
+            let selectedProduct = null;
+            let selectedQty = Number(qtyInput.value || 1);
+
+            function refreshResume() {
+                if (!selectedProduct) {
+                    resumeLine.textContent = 'Seleccione bebida para calcular el total.';
+                    submitBtn.disabled = true;
+                    return;
+                }
+                const name = selectedProduct.dataset.nombre;
+                const price = Number(selectedProduct.dataset.precio || 0);
+                const total = price * selectedQty;
+                resumeLine.textContent = `${selectedQty} x ${name} = $${total.toLocaleString('es-AR')}`;
+                submitBtn.disabled = false;
+            }
+
+            productButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    productButtons.forEach((item) => item.classList.remove('selected'));
+                    button.classList.add('selected');
+                    selectedProduct = button;
+                    productInput.value = button.dataset.producto;
+                    refreshResume();
+                });
+            });
+
+            qtyButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    qtyButtons.forEach((item) => item.classList.remove('selected'));
+                    button.classList.add('selected');
+                    selectedQty = Number(button.dataset.cantidad || 1);
+                    qtyInput.value = selectedQty;
+                    refreshResume();
+                });
+            });
+
+            refreshResume();
+        });
+    </script>
+</body>
+</html>
