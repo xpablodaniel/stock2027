@@ -142,7 +142,7 @@
                 {% for pasajero in habitacion.pasajeros %}
                 <form class="passenger-form bebida-masiva-form" method="POST" action="/bebidas-rapidas">
                     <input type="hidden" name="habitacion" value="{{ habitacion.numero }}">
-                    <input type="hidden" name="pasajero" value="{{ pasajero.nombre }}">
+                    <input type="hidden" name="id_estadia" value="{{ pasajero.id_estadia }}">
                     <input type="hidden" name="producto" class="producto-input">
                     <input type="hidden" name="cantidad" class="cantidad-input" value="{{ cantidades_rapidas[0] if cantidades_rapidas else 1 }}">
 

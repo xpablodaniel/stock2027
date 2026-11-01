@@ -59,6 +59,7 @@ legacy-respaldo.bundle.*
 
 # Datos operativos locales
 data/*.csv
+!data/catalogo_productos.csv
 data/backups/
 data/cierres/
 
@@ -71,8 +72,7 @@ data/cierres/
 .env.*
 !.env.example
 
-# Catálogo local: cada instalación debe aportar su propio catálogo
-/data/catalogo_productos.csv
+
 
 # Repositorio anterior: mantenerlo local y separado
 /legacy/

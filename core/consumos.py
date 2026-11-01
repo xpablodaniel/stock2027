@@ -12,6 +12,7 @@ from pathlib import Path
 
 CONSUMOS_COLUMNS = [
     'id_consumo',
+    'id_estadia',
     'fecha',
     'habitacion',
     'pasajero',
@@ -143,34 +144,34 @@ def _leer_archivo_consumos(archivo_consumos):
 def obtener_consumos_habitacion(num_habitacion, archivo_consumos='data/consumos_diarios.csv'):
     """
     Obtiene todos los consumos de una habitación específica.
-    
+
     Returns:
         DataFrame con los consumos ordenados por fecha
     """
     df = _leer_archivo_consumos(archivo_consumos)
-    
+
     if df.empty or 'habitacion' not in df.columns:
         return pd.DataFrame(columns=CONSUMOS_COLUMNS)
 
     habitaciones = pd.to_numeric(df['habitacion'], errors='coerce').fillna(-1).astype(int)
     consumos_hab = df[habitaciones == int(num_habitacion)].copy()
-    
+
     # Agregar índice para identificar cada consumo
     if not consumos_hab.empty:
         consumos_hab['indice'] = range(len(consumos_hab))
-    
+
     return consumos_hab
 
 
 def obtener_total_consumos(num_habitacion, archivo_consumos='data/consumos_diarios.csv'):
     """
     Calcula el total de consumos de una habitación.
-    
+
     Returns:
         Diccionario con totales por categoría y total general
     """
     consumos = obtener_consumos_habitacion(num_habitacion, archivo_consumos)
-    
+
     if 'estado' in consumos.columns:
         consumos = consumos[
             consumos['estado'].fillna('vigente').astype(str).str.lower()
@@ -185,14 +186,14 @@ def obtener_total_consumos(num_habitacion, archivo_consumos='data/consumos_diari
             'Map': 0,
             'total': 0
         }
-    
+
     totales = {
         'Bebidas': consumos[consumos['categoria'] == 'Bebidas']['monto'].sum() if 'Bebidas' in consumos['categoria'].values else 0,
         'Estadía': consumos[consumos['categoria'] == 'Estadía']['monto'].sum() if 'Estadía' in consumos['categoria'].values else 0,
         'Map': consumos[consumos['categoria'] == 'Map']['monto'].sum() if 'Map' in consumos['categoria'].values else 0,
     }
     totales['total'] = sum(totales.values())
-    
+
     return totales
 
 
@@ -200,11 +201,11 @@ def obtener_consumos_por_pasajero(num_habitacion, archivo_consumos='data/consumo
     """
     Agrupa los consumos de una habitación por pasajero individual.
     Útil cuando hay múltiples personas con distintos vouchers en una habitación.
-    
+
     Args:
         num_habitacion (int): Número de habitación
         archivo_consumos (str): Ruta al archivo CSV de consumos
-    
+
     Returns:
         Diccionario donde la key es el nombre del pasajero y el valor es:
         {
@@ -214,26 +215,27 @@ def obtener_consumos_por_pasajero(num_habitacion, archivo_consumos='data/consumo
         }
     """
     consumos = obtener_consumos_habitacion(num_habitacion, archivo_consumos)
-    
+
     if consumos.empty:
         return {}
-    
+
     consumos_por_pasajero = {}
-    
+
     for _, row in consumos.iterrows():
         pasajero = row['pasajero']
-        
+
         if pasajero not in consumos_por_pasajero:
             consumos_por_pasajero[pasajero] = {
                 'consumos': [],
                 'totales': {'Bebidas': 0, 'Estadía': 0, 'Map': 0},
                 'total_general': 0
             }
-        
+
         # Agregar consumo a la lista
         consumos_por_pasajero[pasajero]['consumos'].append({
             'indice': row.get('indice', 0),
             'id_consumo': str(row.get('id_consumo', '')),
+            'id_estadia': '' if pd.isna(row.get('id_estadia', '')) else str(row.get('id_estadia', '')).strip(),
             'fecha': row['fecha'],
             'categoria': row['categoria'],
             'item': '' if pd.isna(row.get('item', '')) else row.get('item', ''),
@@ -244,8 +246,8 @@ def obtener_consumos_por_pasajero(num_habitacion, archivo_consumos='data/consumo
             'fecha_anulacion': '' if pd.isna(row.get('fecha_anulacion', '')) else row.get('fecha_anulacion', ''),
             'motivo_anulacion': '' if pd.isna(row.get('motivo_anulacion', '')) else row.get('motivo_anulacion', '')
         })
-        
-        
+
+
         # Los anulados se conservan en el historial, pero no suman.
         estado = str(row.get('estado', 'vigente')).strip().lower()
 
@@ -257,24 +259,24 @@ def obtener_consumos_por_pasajero(num_habitacion, archivo_consumos='data/consumo
 
             consumos_por_pasajero[pasajero]['total_general'] += float(row['monto'])
 
-    
+
     return consumos_por_pasajero
 
 
 def obtener_total_consumos_pasajero(num_habitacion, nombre_pasajero, archivo_consumos='data/consumos_diarios.csv'):
     """
     Calcula el total de consumos de un pasajero específico en una habitación.
-    
+
     Args:
         num_habitacion (int): Número de habitación
         nombre_pasajero (str): Nombre completo del pasajero
         archivo_consumos (str): Ruta al archivo CSV de consumos
-    
+
     Returns:
         Diccionario con totales por categoría y total general del pasajero
     """
     consumos = obtener_consumos_habitacion(num_habitacion, archivo_consumos)
-    
+
     if consumos.empty:
         return {
             'Bebidas': 0,
@@ -282,10 +284,10 @@ def obtener_total_consumos_pasajero(num_habitacion, nombre_pasajero, archivo_con
             'Map': 0,
             'total': 0
         }
-    
+
     # Filtrar solo consumos de este pasajero
     consumos_pasajero = consumos[consumos['pasajero'] == nombre_pasajero]
-    
+
     if 'estado' in consumos_pasajero.columns:
         consumos_pasajero = consumos_pasajero[
             consumos_pasajero['estado'].fillna('vigente').astype(str).str.lower()
@@ -300,21 +302,21 @@ def obtener_total_consumos_pasajero(num_habitacion, nombre_pasajero, archivo_con
             'Map': 0,
             'total': 0
         }
-    
+
     totales = {
         'Bebidas': consumos_pasajero[consumos_pasajero['categoria'] == 'Bebidas']['monto'].sum() if 'Bebidas' in consumos_pasajero['categoria'].values else 0,
         'Estadía': consumos_pasajero[consumos_pasajero['categoria'] == 'Estadía']['monto'].sum() if 'Estadía' in consumos_pasajero['categoria'].values else 0,
         'Map': consumos_pasajero[consumos_pasajero['categoria'] == 'Map']['monto'].sum() if 'Map' in consumos_pasajero['categoria'].values else 0,
     }
     totales['total'] = sum(totales.values())
-    
+
     return totales
 
 
-def agregar_consumo(num_habitacion, categoria, monto, pasajero, archivo_consumos='data/consumos_diarios.csv'):
+def agregar_consumo(num_habitacion, categoria, monto, pasajero, archivo_consumos='data/consumos_diarios.csv', id_estadia=None):
     """
     Agrega un nuevo consumo a una habitación.
-    
+
     Returns:
         True si se agregó correctamente, False en caso contrario
     """
@@ -323,7 +325,8 @@ def agregar_consumo(num_habitacion, categoria, monto, pasajero, archivo_consumos
         categoria=categoria,
         monto=monto,
         pasajero=pasajero,
-        archivo_consumos=archivo_consumos
+        archivo_consumos=archivo_consumos,
+        id_estadia=id_estadia
     )
 
 
@@ -335,7 +338,8 @@ def agregar_consumo_detallado(
     item='',
     cantidad=1,
     precio_unitario=None,
-    archivo_consumos='data/consumos_diarios.csv'
+    archivo_consumos='data/consumos_diarios.csv',
+    id_estadia=None
 ):
     """Agrega un consumo permitiendo almacenar item, cantidad y precio unitario."""
     try:
@@ -346,6 +350,7 @@ def agregar_consumo_detallado(
 
         nuevo_registro = {
             'id_consumo': uuid.uuid4().hex,
+            'id_estadia': str(id_estadia).strip() if id_estadia else '',
             'fecha': datetime.now().strftime('%d/%m/%Y %H:%M'),
             'habitacion': int(num_habitacion),
             'pasajero': pasajero,
@@ -381,7 +386,8 @@ def agregar_consumo_bebida_rapida(
     producto_codigo,
     cantidad,
     pasajero,
-    archivo_consumos='data/consumos_diarios.csv'
+    archivo_consumos='data/consumos_diarios.csv',
+    id_estadia=None
 ):
     """Registra un producto usando el catálogo independiente y su precio vigente."""
 
@@ -424,7 +430,8 @@ def agregar_consumo_bebida_rapida(
         item=producto['nombre'],
         cantidad=cantidad,
         precio_unitario=precio_unitario,
-        archivo_consumos=archivo_consumos
+        archivo_consumos=archivo_consumos,
+        id_estadia=id_estadia
     )
 
     if not exito:
@@ -539,26 +546,26 @@ def obtener_resumen_habitacion(num_habitacion, datos_pasajero, archivo_consumos=
     """
     Obtiene un resumen completo de la habitación incluyendo pasajero y consumos.
     Incluye consumos separados por pasajero cuando hay múltiples personas.
-    
+
     Args:
         num_habitacion (int): Número de habitación
         datos_pasajero (dict): Datos del titular de la habitación
         archivo_consumos (str): Ruta al archivo CSV de consumos
-    
+
     Returns:
         Diccionario con toda la información de la habitación
     """
     from core.dashboard import obtener_todos_pasajeros_habitacion
-    
+
     consumos = obtener_consumos_habitacion(num_habitacion, archivo_consumos)
     totales = obtener_total_consumos(num_habitacion, archivo_consumos)
-    
+
     # Obtener TODOS los pasajeros de la habitación
     todos_pasajeros = obtener_todos_pasajeros_habitacion(num_habitacion)
-    
+
     # Obtener consumos agrupados por pasajero
     consumos_por_pasajero = obtener_consumos_por_pasajero(num_habitacion, archivo_consumos)
-    
+
     # Convertir consumos a lista de diccionarios para el template
     lista_consumos = []
 
@@ -591,6 +598,7 @@ def obtener_resumen_habitacion(num_habitacion, datos_pasajero, archivo_consumos=
             lista_consumos.append({
                 'indice': row.get('indice', idx),
                 'id_consumo': str(id_consumo),
+                'id_estadia': '' if pd.isna(row.get('id_estadia', '')) else str(row.get('id_estadia', '')).strip(),
                 'fecha': row['fecha'],
                 'pasajero': row['pasajero'],
                 'categoria': row['categoria'],
@@ -603,11 +611,11 @@ def obtener_resumen_habitacion(num_habitacion, datos_pasajero, archivo_consumos=
                 'motivo_anulacion': motivo_anulacion
             })
 
-    
+
     # Detectar si hay múltiples vouchers (personas que no se conocen)
     vouchers_unicos = set(p['voucher'] for p in todos_pasajeros)
     tiene_vouchers_separados = len(vouchers_unicos) > 1 and len(todos_pasajeros) > 1
-    
+
     return {
         'numero': num_habitacion,
         'pasajero': datos_pasajero,

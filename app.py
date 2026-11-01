@@ -6,11 +6,12 @@ import sys
 import tempfile
 from core.informe_consumos import generar_consolidado_productos
 
+
 # Importar módulos del core
 from core.dashboard import obtener_datos_dashboard, obtener_habitaciones_ocupadas, extraer_num_hab
 from core.consumos import (
-    obtener_resumen_habitacion, 
-    agregar_consumo, 
+    obtener_resumen_habitacion,
+    agregar_consumo,
     anular_consumo_por_id,
     obtener_historial_consumos,
     agregar_consumo_bebida_rapida,
@@ -18,6 +19,7 @@ from core.consumos import (
     CANTIDADES_RAPIDAS
 )
 from core.reserva_express import crear_reserva_express, obtener_habitaciones_disponibles, validar_datos_reserva
+from core.identidad_estadias import procesar_identidades
 
 app = Flask(__name__)
 app.secret_key = 'temporada_2026_recepcion_key_secreta'
@@ -33,16 +35,88 @@ def validar_pasajero(habitacion):
     """
     if not os.path.exists(DB_PASAJEROS):
         return None
-    
+
     df_pasajeros = pd.read_csv(DB_PASAJEROS)
     pasajero = df_pasajeros[
         df_pasajeros['Nro. habitación'].apply(extraer_num_hab) == int(habitacion)
     ]
-    
+
     if pasajero.empty:
         return None
-    
+
     return pasajero.iloc[0]['Apellido y nombre']
+
+def validar_estadia_para_consumo(id_estadia, habitacion, archivo_pasajeros=DB_PASAJEROS):
+    """
+    Valida que una estadía exista, corresponda a la habitación indicada
+    y se encuentre vigente en la fecha actual.
+
+    Retorna los datos del pasajero si la validación es correcta.
+    Retorna None si no existe o no corresponde.
+    """
+    id_estadia = str(id_estadia or '').strip()
+
+    if not id_estadia or not os.path.exists(archivo_pasajeros):
+        return None
+
+    try:
+        df = pd.read_csv(archivo_pasajeros, dtype={'id_estadia': str})
+
+        columnas_requeridas = {
+            'id_estadia',
+            'Nro. habitación',
+            'Apellido y nombre',
+            'Fecha de ingreso',
+            'Fecha de egreso'
+        }
+
+        if not columnas_requeridas.issubset(df.columns):
+            return None
+
+        coincidencias = df[
+            df['id_estadia'].fillna('').astype(str).str.strip() == id_estadia
+        ]
+
+        # El identificador debe corresponder a un único registro.
+        if len(coincidencias) != 1:
+            return None
+
+        pasajero = coincidencias.iloc[0]
+
+        habitacion_registro = extraer_num_hab(
+            pasajero['Nro. habitación']
+        )
+
+        if habitacion_registro != int(habitacion):
+            return None
+
+        # Validar que la fecha actual esté dentro de la estadía.
+        fecha_ingreso = datetime.strptime(
+            str(pasajero['Fecha de ingreso']).strip(),
+            '%d/%m/%Y'
+        ).date()
+
+        fecha_egreso = datetime.strptime(
+            str(pasajero['Fecha de egreso']).strip(),
+            '%d/%m/%Y'
+        ).date()
+
+        fecha_actual = datetime.now().date()
+
+        if not (fecha_ingreso <= fecha_actual <= fecha_egreso):
+            return None
+
+        return {
+            'id_estadia': id_estadia,
+            'habitacion': habitacion_registro,
+            'pasajero': str(pasajero['Apellido y nombre']).strip(),
+            'ingreso': pasajero['Fecha de ingreso'],
+            'egreso': pasajero['Fecha de egreso']
+        }
+
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        print(f"Error al validar estadía para consumo: {e}")
+        return None
 
 @app.route('/')
 def index():
@@ -53,7 +127,7 @@ def index():
 def dashboard():
     """Dashboard principal con las 53 habitaciones"""
     datos = obtener_datos_dashboard()
-    return render_template('dashboard.html', 
+    return render_template('dashboard.html',
                          pisos=datos['pisos'],
                          estados=datos['estados'],
                          ocupadas=datos['ocupadas'],
@@ -61,83 +135,111 @@ def dashboard():
                          estadisticas=datos['estadisticas'],
                          checkouts_hoy=datos['checkouts_hoy'])
 
+
+
 @app.route('/habitacion/<int:num_habitacion>')
 def ficha_habitacion(num_habitacion):
     """Muestra la ficha individual de una habitación"""
     from core.dashboard import es_checkout_hoy
-    
+
     # Obtener datos del pasajero
     habitaciones_ocupadas = obtener_habitaciones_ocupadas()
-    
+
     # Verificar que la habitación esté ocupada
     if num_habitacion not in habitaciones_ocupadas:
         flash(f'La habitación {num_habitacion} no está ocupada actualmente', 'warning')
         return redirect('/dashboard')
-    
+
     # Obtener resumen completo de la habitación
     datos_pasajero = habitaciones_ocupadas[num_habitacion]
     resumen = obtener_resumen_habitacion(num_habitacion, datos_pasajero)
-    
+
     # Verificar si es checkout hoy
     resumen['es_checkout_hoy'] = es_checkout_hoy(datos_pasajero['egreso'])
     resumen['catalogo_bebidas'] = obtener_catalogo_bebidas()
     resumen['cantidades_rapidas'] = CANTIDADES_RAPIDAS
-    
+
     return render_template('ficha_habitacion.html', habitacion=resumen)
 
 @app.route('/habitacion/<int:num_habitacion>/agregar', methods=['POST'])
 def agregar_consumo_habitacion(num_habitacion):
-    """Agrega un consumo a una habitación desde su ficha"""
-    from core.dashboard import obtener_todos_pasajeros_habitacion
-    
+    """Agrega un consumo asociado a una estadía validada."""
+
+    id_estadia = request.form.get('id_estadia', '').strip()
     categoria = request.form.get('categoria')
     monto = request.form.get('monto')
-    pasajero_seleccionado = request.form.get('pasajero')  # Nuevo: pasajero seleccionado
-    
-    # Validación
+
     if not categoria or not monto:
         flash('Todos los campos son obligatorios', 'danger')
         return redirect(f'/habitacion/{num_habitacion}')
-    
-    # Obtener habitaciones ocupadas
+
     habitaciones_ocupadas = obtener_habitaciones_ocupadas()
+
     if num_habitacion not in habitaciones_ocupadas:
         flash('Habitación no encontrada', 'danger')
         return redirect('/dashboard')
-    
-    # Determinar a qué pasajero cargar el consumo
-    if pasajero_seleccionado:
-        # Si se seleccionó un pasajero específico (habitaciones con múltiples vouchers)
-        pasajero = pasajero_seleccionado
+
+    datos_estadia = validar_estadia_para_consumo(
+        id_estadia,
+        num_habitacion
+    )
+
+    if not datos_estadia:
+        flash('No se pudo validar la estadía seleccionada.', 'danger')
+        return redirect(f'/habitacion/{num_habitacion}')
+
+    pasajero = datos_estadia['pasajero']
+
+    if agregar_consumo(
+        num_habitacion,
+        categoria,
+        monto,
+        pasajero,
+        id_estadia=datos_estadia['id_estadia']
+    ):
+        flash(f'Consumo de ${monto} agregado a {pasajero}', 'success')
     else:
-        # Si no hay selección (habitación con 1 persona o mismo voucher), usar el titular
-        pasajero = habitaciones_ocupadas[num_habitacion]['pasajero']
-    
-    # Agregar el consumo
-    if agregar_consumo(num_habitacion, categoria, monto, pasajero):
-        flash(f'✅ Consumo de ${monto} agregado a {pasajero}', 'success')
-    else:
-        flash('❌ Error al agregar el consumo', 'danger')
-    
+        flash('Error al agregar el consumo', 'danger')
+
     return redirect(f'/habitacion/{num_habitacion}')
 
 
 @app.route('/habitacion/<int:num_habitacion>/agregar-bebida', methods=['POST'])
 def agregar_bebida_rapida_habitacion(num_habitacion):
-    """Agrega una bebida rápida con producto y cantidad predefinidos."""
+    """Agrega una bebida asociada a una estadía validada."""
+
     producto = request.form.get('producto')
     cantidad = request.form.get('cantidad', 1)
-    pasajero_seleccionado = request.form.get('pasajero')
+    id_estadia = request.form.get('id_estadia', '').strip()
 
     habitaciones_ocupadas = obtener_habitaciones_ocupadas()
+
     if num_habitacion not in habitaciones_ocupadas:
         flash('Habitación no encontrada', 'danger')
         return redirect('/dashboard')
 
-    pasajero = pasajero_seleccionado or habitaciones_ocupadas[num_habitacion]['pasajero']
-    exito, mensaje = agregar_consumo_bebida_rapida(num_habitacion, producto, cantidad, pasajero)
+    datos_estadia = validar_estadia_para_consumo(
+        id_estadia,
+        num_habitacion
+    )
 
-    flash(f'✅ {mensaje}' if exito else f'❌ {mensaje}', 'success' if exito else 'danger')
+    if not datos_estadia:
+        flash('No se pudo validar la estadía seleccionada.', 'danger')
+        return redirect(f'/habitacion/{num_habitacion}')
+
+    exito, mensaje = agregar_consumo_bebida_rapida(
+        num_habitacion,
+        producto,
+        cantidad,
+        datos_estadia['pasajero'],
+        id_estadia=datos_estadia['id_estadia']
+    )
+
+    flash(
+        mensaje if exito else mensaje,
+        'success' if exito else 'danger'
+    )
+
     return redirect(f'/habitacion/{num_habitacion}')
 
 @app.route('/habitacion/<int:num_habitacion>/anular/<string:id_consumo>', methods=['POST'])
@@ -157,35 +259,35 @@ def anular_consumo_habitacion(num_habitacion, id_consumo):
 def checkout(num_habitacion):
     """Muestra la pantalla de check-out con resumen final"""
     from core.dashboard import es_checkout_hoy
-    
+
     # Obtener datos del pasajero
     habitaciones_ocupadas = obtener_habitaciones_ocupadas()
-    
+
     if num_habitacion not in habitaciones_ocupadas:
         flash('Habitación no encontrada o no ocupada', 'danger')
         return redirect('/dashboard')
-    
+
     # Obtener resumen completo
     datos_pasajero = habitaciones_ocupadas[num_habitacion]
     resumen = obtener_resumen_habitacion(num_habitacion, datos_pasajero)
-    
+
     # Verificar si es checkout hoy o anticipado
     resumen['es_checkout_hoy'] = es_checkout_hoy(datos_pasajero['egreso'])
-    
+
     return render_template('checkout.html', checkout=resumen)
 
 @app.route('/checkout/<int:num_habitacion>/confirmar', methods=['POST'])
 def confirmar_checkout(num_habitacion):
     """Procesa el check-out individual: elimina al pasajero y sus consumos pagados"""
     habitaciones_ocupadas = obtener_habitaciones_ocupadas()
-    
+
     if num_habitacion not in habitaciones_ocupadas:
         flash('Habitación no encontrada', 'danger')
         return redirect('/dashboard')
-    
+
     try:
         # Los consumos no se eliminan: forman parte del historial permanente.
-        
+
         # 2. Eliminar pasajero del registro
         if os.path.exists(DB_PASAJEROS):
             df_pasajeros = pd.read_csv(DB_PASAJEROS)
@@ -193,10 +295,10 @@ def confirmar_checkout(num_habitacion):
                 df_pasajeros['Nro. habitación'].apply(extraer_num_hab) != num_habitacion
             ]
             df_pasajeros.to_csv(DB_PASAJEROS, index=False)
-        
+
         flash(f'✅ Check-out realizado exitosamente. Habitación {num_habitacion} ahora disponible.', 'success')
         return redirect('/dashboard')
-        
+
     except Exception as e:
         flash(f'❌ Error al procesar check-out: {str(e)}', 'danger')
         return redirect(f'/checkout/{num_habitacion}')
@@ -207,22 +309,22 @@ def vista_checkout_masivo():
     """Vista previa del checkout masivo con resumen de habitaciones y consumos"""
     from core.dashboard import obtener_habitaciones_checkout_pendientes
     from core.consumos import obtener_total_consumos
-    
+
     # Obtener todas las habitaciones con checkout pendiente (hoy + vencidas)
     habitaciones_checkout = obtener_habitaciones_checkout_pendientes()
-    
+
     if not habitaciones_checkout:
         flash('No hay habitaciones con checkout pendiente para procesar', 'info')
         return redirect('/dashboard')
-    
+
     # Preparar resumen detallado
     resumen_checkouts = []
     total_consumos_general = 0
-    
+
     for num_hab in sorted(habitaciones_checkout.keys()):
         datos = habitaciones_checkout[num_hab]
         totales_consumos = obtener_total_consumos(num_hab)
-        
+
         resumen_checkouts.append({
             'habitacion': num_hab,
             'pasajero': datos['pasajero'],
@@ -234,8 +336,8 @@ def vista_checkout_masivo():
             'detalle_consumos': totales_consumos
         })
         total_consumos_general += totales_consumos['total']
-    
-    return render_template('checkout_masivo.html', 
+
+    return render_template('checkout_masivo.html',
                          checkouts=resumen_checkouts,
                          total_habitaciones=len(resumen_checkouts),
                          total_consumos=total_consumos_general)
@@ -313,18 +415,18 @@ def cargar_consumo():
     habitacion = request.form.get('habitacion')
     categoria = request.form.get('categoria')
     monto = request.form.get('monto')
-    
+
     # Validación básica
     if not habitacion or not categoria or not monto:
         flash('Todos los campos son obligatorios', 'danger')
         return redirect('/')
-    
+
     # Validar que el pasajero exista
     nombre_pasajero = validar_pasajero(habitacion)
     if not nombre_pasajero:
         flash(f'❌ La habitación {habitacion} no está registrada en el sistema', 'danger')
         return redirect('/')
-    
+
     # Registrar el consumo
     nuevo_registro = {
         'fecha': datetime.now().strftime('%d/%m/%Y %H:%M'),
@@ -333,15 +435,15 @@ def cargar_consumo():
         'categoria': categoria,
         'monto': float(monto)
     }
-    
+
     # Guardar en el CSV
     df_nuevo = pd.DataFrame([nuevo_registro])
-    
+
     if os.path.exists(DB_CONSUMOS):
         df_nuevo.to_csv(DB_CONSUMOS, mode='a', header=False, index=False)
     else:
         df_nuevo.to_csv(DB_CONSUMOS, mode='w', header=True, index=False)
-    
+
     flash(f'✅ Consumo registrado: {categoria} - ${monto} para {nombre_pasajero} (Hab. {habitacion})', 'success')
     return redirect('/')
 
@@ -358,18 +460,18 @@ def cierre_dia():
 
     # 2. Pivotear datos: Habitaciones como filas, solo 3 categorías como columnas
     tabla_cierre = df.pivot_table(
-        index=['habitacion', 'pasajero'], 
-        columns='categoria', 
-        values='monto', 
-        aggfunc='sum', 
+        index=['habitacion', 'pasajero'],
+        columns='categoria',
+        values='monto',
+        aggfunc='sum',
         fill_value=0
     )
-    
+
     # 3. Asegurar que existan las 3 columnas principales
     for col in ['Bebidas', 'Estadía', 'Map']:
         if col not in tabla_cierre.columns:
             tabla_cierre[col] = 0
-    
+
     # 4. Seleccionar solo las columnas que nos interesan
     columnas_orden = ['Bebidas', 'Estadía', 'Map']
     tabla_cierre = tabla_cierre[columnas_orden]
@@ -390,12 +492,12 @@ def cierre_xlsx():
     if not os.path.exists(DB_CONSUMOS):
         flash("No hay consumos registrados para generar el archivo de salidas.", "warning")
         return redirect('/')
-    
+
     try:
         # Leer consumos
         df_consumos = obtener_historial_consumos(DB_CONSUMOS)
         df_consumos = df_consumos[df_consumos['estado'].fillna('vigente').astype(str).str.lower() != 'anulado']
-        
+
         # Crear tabla pivote: habitaciones en filas, categorías en columnas
         tabla_pivot = df_consumos.pivot_table(
             index=['habitacion', 'pasajero'],
@@ -404,19 +506,19 @@ def cierre_xlsx():
             aggfunc='sum',
             fill_value=0
         ).reset_index()
-        
+
         # Asegurar que existan todas las columnas (aunque estén vacías)
         for col in ['Estadía', 'Map', 'Bebidas']:
             if col not in tabla_pivot.columns:
                 tabla_pivot[col] = 0
-        
+
         # Calcular total por habitación
         tabla_pivot['Total'] = tabla_pivot['Estadía'] + tabla_pivot['Map'] + tabla_pivot['Bebidas']
-        
+
         # Crear estructura del archivo (replica salidas.xlsx)
         max_filas = 30
         data = [[None] * 6 for _ in range(max_filas)]
-        
+
         # Fila 0: Título
         data[0] = ['Pase de caja e información a turno mañana', None, None, None, None, None]
         data[2] = [None, None, 'Turno:   00 A 08 HS', None, None, None]
@@ -424,7 +526,7 @@ def cierre_xlsx():
         data[4] = ['Detalle a cobrar de habitaciones con salida', None, None, None, None, None]
         data[5] = ['HAB', 'Estadía', 'Map', 'Bebidas', 'Forma de pago', 'Total']
         data[6] = [None, None, None, None, None, None]
-        
+
         # Datos de habitaciones - Cada categoría en su columna
         fila_actual = 7
         for idx, row in tabla_pivot.iterrows():
@@ -433,7 +535,7 @@ def cierre_xlsx():
             map_val = row['Map'] if row['Map'] > 0 else None
             bebidas = row['Bebidas'] if row['Bebidas'] > 0 else None
             total = row['Total']
-            
+
             # Distribuir valores en sus respectivas columnas
             data[fila_actual] = [
                 int(habitacion),  # HAB (col 0)
@@ -444,19 +546,19 @@ def cierre_xlsx():
                 total             # Total (col 5)
             ]
             fila_actual += 1
-        
+
         # Rellenar filas vacías
         for i in range(fila_actual, max_filas):
             data[i] = [None, None, None, None, None, 0.0]
-        
+
         # Guardar como XLSX in archivo temporal
         df_salidas = pd.DataFrame(data)
         with tempfile.NamedTemporaryFile(mode='wb', suffix='.xlsx', delete=False) as tmp:
             archivo_salida = tmp.name
             df_salidas.to_excel(archivo_salida, engine='openpyxl', index=False, header=False)
-        
+
         return send_file(os.path.abspath(archivo_salida), as_attachment=True, download_name=f'salidas_{datetime.now().strftime("%d-%m-%Y")}.xlsx')
-        
+
     except Exception as e:
         flash(f"Error al generar archivo Excel: {str(e)}", "danger")
         return redirect('/')
@@ -465,18 +567,18 @@ def cierre_xlsx():
 def generar_salidas_checkouts():
     """Generar archivo consolidado de checkouts del día (XLSX) - Descarga automática"""
     from core.dashboard import obtener_habitaciones_checkout, obtener_habitaciones_ocupadas
-    
+
     try:
         # Obtener habitaciones con checkout hoy
         checkouts_hoy = obtener_habitaciones_checkout()
-        
+
         if not checkouts_hoy:
             flash("No hay habitaciones con check-out programado para hoy.", "warning")
             return redirect('/dashboard')
-        
+
         # Obtener datos de las habitaciones ocupadas
         habitaciones_ocupadas = obtener_habitaciones_ocupadas()
-        
+
         # Crear lista de habitaciones con checkout y sus consumos
         datos_checkouts = []
         for num_hab in checkouts_hoy:
@@ -491,7 +593,7 @@ def generar_salidas_checkouts():
                     'Bebidas': resumen['totales']['Bebidas'],
                     'Total': resumen['totales']['total']
                 })
-        
+
         # Si no hay datos, generar archivo vacío indicando que no hay consumos
         if not datos_checkouts:
             # Aún así crear estructura para las habitaciones con checkout
@@ -504,11 +606,11 @@ def generar_salidas_checkouts():
                     'Bebidas': 0,
                     'Total': 0
                 })
-        
+
         # Crear estructura del archivo (replica salidas.xlsx)
         max_filas = 30
         data = [[None] * 6 for _ in range(max_filas)]
-        
+
         # Encabezados
         data[0] = ['Pase de caja e información a turno mañana', None, None, None, None, None]
         data[2] = [None, None, 'Turno:   00 A 08 HS', None, None, None]
@@ -516,7 +618,7 @@ def generar_salidas_checkouts():
         data[4] = ['Detalle a cobrar de habitaciones con salida HOY', None, None, None, None, None]
         data[5] = ['HAB', 'Estadía', 'Map', 'Bebidas', 'Forma de pago', 'Total']
         data[6] = [None, None, None, None, None, None]
-        
+
         # Datos de habitaciones con checkout - Cada categoría en su columna
         fila_actual = 7
         for item in sorted(datos_checkouts, key=lambda x: x['habitacion']):
@@ -524,7 +626,7 @@ def generar_salidas_checkouts():
             map_val = item['Map'] if item['Map'] > 0 else None
             bebidas = item['Bebidas'] if item['Bebidas'] > 0 else None
             total = item['Total']
-            
+
             data[fila_actual] = [
                 int(item['habitacion']),  # HAB (col 0)
                 estadia,                   # Estadía (col 1)
@@ -534,20 +636,20 @@ def generar_salidas_checkouts():
                 total                      # Total (col 5)
             ]
             fila_actual += 1
-        
+
         # Rellenar filas vacías
         for i in range(fila_actual, max_filas):
             data[i] = [None, None, None, None, None, None]
-        
+
         # Guardar como XLSX en archivo temporal
         df_salidas = pd.DataFrame(data)
         with tempfile.NamedTemporaryFile(mode='wb', suffix='.xlsx', delete=False) as tmp:
             archivo_salida = tmp.name
             df_salidas.to_excel(archivo_salida, engine='openpyxl', index=False, header=False)
-        
+
         # Descargar automáticamente (usar ruta absoluta)
         return send_file(os.path.abspath(archivo_salida), as_attachment=True, download_name=f'checkouts_{datetime.now().strftime("%d-%m-%Y")}.xlsx')
-        
+
     except Exception as e:
         flash(f"Error al generar archivo de checkouts: {str(e)}", "danger")
         return redirect('/dashboard')
@@ -594,8 +696,9 @@ def ver_consumos():
     <div class="table-responsive"><table class="table table-striped table-hover align-middle">
     <thead class="table-dark"><tr><th>#</th><th>Fecha</th><th>Hab.</th><th>Pasajero</th><th>Categoría / artículo</th><th>Monto original</th><th>Estado / auditoría</th><th>Acción</th></tr></thead>
     <tbody>{filas_html}</tbody></table></div>
-    <a href="/dashboard" class="btn btn-primary">Volver al Dashboard</a>
-    <a href="/cierre-dia" class="btn btn-secondary">Descargar CSV</a><a href="/cierre-xlsx" class="btn btn-success">Descargar Excel</a>
+        <a href="/dashboard" class="btn btn-primary">
+        Volver al Dashboard
+    </a>
     </main></body></html>"""
 
 
@@ -649,7 +752,7 @@ def reiniciar_temporada():
 def gestionar_pasajeros():
     """Página para gestionar archivos de pasajeros (cambiar entre temporada alta/baja)"""
     from core.dashboard import es_checkout_hoy
-    
+
     # Obtener información del archivo actual
     info_actual = {
         'total': 0,
@@ -660,160 +763,245 @@ def gestionar_pasajeros():
         'fecha_egreso_min': 'N/A',
         'fecha_egreso_max': 'N/A'
     }
-    
+
     if os.path.exists(DB_PASAJEROS):
         df = pd.read_csv(DB_PASAJEROS)
         info_actual['total'] = len(df)
         info_actual['habitaciones'] = df['Nro. habitación'].tolist()
-        
+
         # Contar checkouts hoy
         checkouts_hoy = 0
         for _, row in df.iterrows():
             if es_checkout_hoy(row['Fecha de egreso']):
                 checkouts_hoy += 1
         info_actual['checkouts_hoy'] = checkouts_hoy
-        
+
         # Rango de fechas
         info_actual['fecha_ingreso_min'] = df['Fecha de ingreso'].min()
         info_actual['fecha_ingreso_max'] = df['Fecha de ingreso'].max()
         info_actual['fecha_egreso_min'] = df['Fecha de egreso'].min()
         info_actual['fecha_egreso_max'] = df['Fecha de egreso'].max()
-    
+
     return render_template('gestionar_pasajeros.html', info_actual=info_actual)
 
 @app.route('/subir-pasajeros', methods=['POST'])
 def subir_pasajeros():
-    """Permite subir un archivo CSV de pasajeros personalizado"""
+    """
+    Importa el padrón de pasajeros conservando la identidad
+    individual de cada estadía.
+    """
+    import shutil
+
+    archivo_temporal = None
+
     try:
+        # 1. Verificar que se haya seleccionado un archivo.
         if 'archivo' not in request.files:
-            flash('❌ No se seleccionó ningún archivo', 'danger')
+            flash('No se seleccionó ningún archivo.', 'danger')
             return redirect('/gestionar-pasajeros')
-        
+
         archivo = request.files['archivo']
-        
-        if archivo.filename == '':
-            flash('❌ No se seleccionó ningún archivo', 'danger')
+
+        if not archivo.filename:
+            flash('No se seleccionó ningún archivo.', 'danger')
             return redirect('/gestionar-pasajeros')
-        
-        if not archivo.filename.endswith('.csv'):
-            flash('❌ El archivo debe ser CSV', 'danger')
+
+        if not archivo.filename.lower().endswith('.csv'):
+            flash('El archivo debe tener formato CSV.', 'danger')
             return redirect('/gestionar-pasajeros')
-        
-        # Crear backup del archivo actual
-        if os.path.exists(DB_PASAJEROS):
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_path = f'data/backups/pasajeros_backup_{timestamp}.csv'
-            os.makedirs('data/backups', exist_ok=True)
-            
-            import shutil
-            shutil.copy(DB_PASAJEROS, backup_path)
-        
-        # Validar estructura del CSV
-        df_nuevo = pd.read_csv(archivo)
-        columnas_requeridas = ['Nro. habitación', 'Fecha de ingreso', 'Fecha de egreso', 
-                               'Apellido y nombre', 'Servicios']
-        
-        for col in columnas_requeridas:
-            if col not in df_nuevo.columns:
-                flash(f'❌ Falta la columna requerida: {col}', 'danger')
-                return redirect('/gestionar-pasajeros')
-        
-        # Determinar modo de carga
-        modo = request.form.get('modo_carga', 'agregar')
-        
-        if modo == 'reemplazar':
-            # MODO REEMPLAZAR: Sobreescribir todo (como antes)
-            df_nuevo.to_csv(DB_PASAJEROS, index=False)
-            
-            # El padrón activo se reemplaza, pero el historial de consumos es permanente.
+
+        # 2. Validar el modo de importación.
+        modo = request.form.get('modo_carga', 'agregar').strip()
+
+        if modo not in ('agregar', 'reemplazar'):
+            flash('El modo de importación seleccionado no es válido.', 'danger')
+            return redirect('/gestionar-pasajeros')
+
+        # 3. Leer el CSV nuevo.
+        try:
+            df_nuevo = pd.read_csv(archivo)
+        except (ValueError, UnicodeDecodeError, pd.errors.ParserError) as exc:
+            flash(f'No se pudo leer el archivo CSV: {exc}', 'danger')
+            return redirect('/gestionar-pasajeros')
+
+        if df_nuevo.empty:
+            flash('El archivo CSV no contiene registros.', 'warning')
+            return redirect('/gestionar-pasajeros')
+
+        # 4. Validar las columnas necesarias.
+        columnas_requeridas = [
+            'Nro. habitación',
+            'Fecha de ingreso',
+            'Fecha de egreso',
+            'Apellido y nombre',
+            'Nro. doc.',
+            'Voucher',
+            'Servicios'
+        ]
+
+        faltantes = [
+            columna for columna in columnas_requeridas
+            if columna not in df_nuevo.columns
+        ]
+
+        if faltantes:
             flash(
-                f'✅ Archivo reemplazado completamente ({len(df_nuevo)} pasajeros). '
-                'El historial de consumos se conservó.',
-                'success'
+                'Faltan columnas requeridas: '
+                + ', '.join(faltantes),
+                'danger'
+            )
+            return redirect('/gestionar-pasajeros')
+
+        # 5. Leer el padrón actual.
+        if os.path.exists(DB_PASAJEROS):
+            df_existente = pd.read_csv(
+                DB_PASAJEROS,
+                dtype={'id_estadia': str}
             )
         else:
-            # MODO AGREGAR: Mantener reservas existentes y agregar/actualizar nuevas
-            if os.path.exists(DB_PASAJEROS):
-                df_existente = pd.read_csv(DB_PASAJEROS)
-                
-                # Obtener habitaciones del archivo nuevo
-                habitaciones_nuevas = df_nuevo['Nro. habitación'].unique()
-                
-                # Mantener solo las habitaciones que NO están en el archivo nuevo
-                df_mantener = df_existente[~df_existente['Nro. habitación'].isin(habitaciones_nuevas)]
-                
-                # Combinar: mantener existentes + agregar nuevas
-                df_final = pd.concat([df_mantener, df_nuevo], ignore_index=True)
-                
-                # Actualizar pasajeros no debe eliminar consumos históricos.
-                flash(f'✅ Archivo agregado: {len(df_nuevo)} nuevos pasajeros. '
-                      f'Mantenidas: {len(df_mantener)} reservas existentes. '
-                      f'Total: {len(df_final)} pasajeros. El historial de consumos se conservó.', 'success')
-            else:
-                # Si no existe archivo previo, crear nuevo
-                df_final = df_nuevo
-                flash(f'✅ Archivo creado con {len(df_nuevo)} pasajeros.', 'success')
-            
-            # Guardar archivo combinado
-            df_final.to_csv(DB_PASAJEROS, index=False)
-        
-        return redirect('/dashboard')
-        
-    except Exception as e:
-        flash(f'❌ Error al subir archivo: {str(e)}', 'danger')
+            df_existente = pd.DataFrame()
+
+        # 6. Procesar las identidades.
+        df_final, resumen = procesar_identidades(
+            df_existente,
+            df_nuevo,
+            modo=modo
+        )
+
+        # 7. Preparar directorios.
+        directorio_datos = os.path.dirname(DB_PASAJEROS) or '.'
+        os.makedirs(directorio_datos, exist_ok=True)
+
+              # 8. Crear copia de seguridad antes de modificar el padrón.
+        backup_path = None
+
+        if os.path.exists(DB_PASAJEROS):
+            directorio_backups = os.path.join(
+                directorio_datos,
+                'backups'
+            )
+
+            os.makedirs(directorio_backups, exist_ok=True)
+
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+
+            backup_path = os.path.join(
+                directorio_backups,
+                f'pasajeros_backup_{timestamp}.csv'
+            )
+
+            shutil.copy2(DB_PASAJEROS, backup_path)
+
+
+        # 9. Guardar primero en un archivo temporal.
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.csv',
+            prefix='pasajeros_',
+            dir=directorio_datos,
+            delete=False,
+            newline='',
+            encoding='utf-8'
+        ) as tmp:
+            archivo_temporal = tmp.name
+
+            df_final.to_csv(
+                archivo_temporal,
+                index=False
+            )
+
+        # 10. Reemplazar el padrón solamente cuando
+        # el archivo temporal se haya escrito correctamente.
+        os.replace(archivo_temporal, DB_PASAJEROS)
+        archivo_temporal = None
+
+        # 11. Preparar el resumen de la operación.
+        mensaje = (
+            f"Importación completada. "
+            f"Coincidencias reconocidas: {resumen['coincidencias']}. "
+            f"Nuevas estadías: {resumen['nuevas_estadias']}. "
+            f"Coincidencias ambiguas: "
+            f"{resumen['coincidencias_ambiguas']}. "
+            f"Total de registros activos: {len(df_final)}."
+        )
+
+        if modo == 'reemplazar':
+            mensaje = 'Padrón completo reemplazado. ' + mensaje
+        else:
+            mensaje = 'Reservas agregadas/actualizadas. ' + mensaje
+
+        if backup_path:
+            mensaje += ' Se creó una copia de seguridad.'
+
+        flash(mensaje, 'success')
+
         return redirect('/gestionar-pasajeros')
+
+    except Exception as e:
+        flash(
+            f'Error al importar el padrón de pasajeros: {str(e)}',
+            'danger'
+        )
+        return redirect('/gestionar-pasajeros')
+
+    finally:
+        # Si hubo un error antes de completar la escritura,
+        # retirar el archivo temporal sin tocar el padrón original.
+        if archivo_temporal and os.path.exists(archivo_temporal):
+            os.remove(archivo_temporal)
+
 
 @app.route('/reserva-express', methods=['GET', 'POST'])
 def reserva_express():
     """Página de registro rápido para walk-ins (huéspedes sin reserva)"""
-    
+
     if request.method == 'GET':
         from core.dashboard import obtener_habitaciones_reservadas_futuras
         from core.reserva_express import calcular_noches_maximas
-        
+
         # Mostrar formulario con habitaciones disponibles
         habitaciones_disponibles = obtener_habitaciones_disponibles()
         habitacion_preseleccionada = request.args.get('habitacion', type=int)
         tiene_reserva_futura = request.args.get('reserva_futura', type=int) == 1
-        
+
         # Calcular límites de noches por habitación
         limites_habitaciones = {}
         for hab in habitaciones_disponibles:
             limite = calcular_noches_maximas(hab)
             if limite > 0:
                 limites_habitaciones[hab] = limite
-        
+
         # Si tiene reserva futura, obtener la información
         fecha_reserva_futura = None
         if tiene_reserva_futura and habitacion_preseleccionada:
             reservas_futuras = obtener_habitaciones_reservadas_futuras()
             if habitacion_preseleccionada in reservas_futuras:
                 fecha_reserva_futura = reservas_futuras[habitacion_preseleccionada]['ingreso']
-        
-        return render_template('reserva_express.html', 
+
+        return render_template('reserva_express.html',
                              habitaciones=habitaciones_disponibles,
                              total_disponibles=len(habitaciones_disponibles),
                              habitacion_preseleccionada=habitacion_preseleccionada,
                              tiene_reserva_futura=tiene_reserva_futura,
                              fecha_reserva_futura=fecha_reserva_futura,
                              limites_habitaciones=limites_habitaciones)
-    
+
     # POST: Procesar reserva
     habitacion = request.form.get('habitacion')
     nombre = request.form.get('nombre', 'Huésped sin reserva').strip()
     pax = request.form.get('pax', 1)
     servicios = request.form.get('servicios', 'DESAYUNO')
     noches = request.form.get('noches', 1)
-    
+
     # Validar datos
     valido, error = validar_datos_reserva(habitacion, nombre, pax)
     if not valido:
         flash(f'❌ {error}', 'danger')
         return redirect('/reserva-express')
-    
+
     # Crear reserva con las noches solicitadas
     reserva, mensaje = crear_reserva_express(habitacion, nombre, pax, servicios, noches)
-    
+
     if reserva:
         flash(f'✅ {mensaje}. Habitación {habitacion} reservada para {nombre} por {noches} noche(s).', 'success')
         return redirect('/dashboard')
@@ -829,54 +1017,54 @@ def cambiar_habitacion_route(num_habitacion):
         cambiar_habitacion,
         validar_cambio_habitacion
     )
-    
+
     if request.method == 'GET':
         # Verificar que la habitación esté ocupada
         habitaciones_ocupadas = obtener_habitaciones_ocupadas()
-        
+
         if num_habitacion not in habitaciones_ocupadas:
             flash('La habitación no está ocupada actualmente', 'danger')
             return redirect('/dashboard')
-        
+
         # Obtener datos del pasajero
         datos_pasajero = habitaciones_ocupadas[num_habitacion]
-        
+
         # Obtener consumos para mostrar cuántos hay
         if os.path.exists(DB_CONSUMOS):
             df_consumos = pd.read_csv(DB_CONSUMOS)
             cantidad_consumos = len(df_consumos[df_consumos['habitacion'] == num_habitacion])
         else:
             cantidad_consumos = 0
-        
+
         # Obtener habitaciones disponibles
         habitaciones_disponibles = obtener_habitaciones_disponibles_para_cambio(num_habitacion)
-        
+
         return render_template('cambiar_habitacion.html',
                              habitacion_origen=num_habitacion,
                              datos_pasajero=datos_pasajero,
                              cantidad_consumos=cantidad_consumos,
                              habitaciones_disponibles=habitaciones_disponibles,
                              total_disponibles=len(habitaciones_disponibles))
-    
+
     # POST: Procesar cambio
     habitacion_destino = request.form.get('habitacion_destino')
     motivo = request.form.get('motivo', '')
     observaciones = request.form.get('observaciones', '')
-    
+
     # Combinar motivo con observaciones
     motivo_completo = f"{motivo}"
     if observaciones:
         motivo_completo += f" - {observaciones}"
-    
+
     # Validar
     valido, error = validar_cambio_habitacion(num_habitacion, habitacion_destino)
     if not valido:
         flash(f'❌ {error}', 'danger')
         return redirect(f'/cambiar-habitacion/{num_habitacion}')
-    
+
     # Realizar cambio
     exito, mensaje = cambiar_habitacion(num_habitacion, habitacion_destino, motivo_completo)
-    
+
     if exito:
         flash(f'✅ {mensaje}', 'success')
         return redirect(f'/habitacion/{habitacion_destino}')
@@ -944,36 +1132,52 @@ def cambiar_habitacion_parcial_route(num_habitacion):
 
 @app.route('/bebidas-rapidas', methods=['GET', 'POST'])
 def bebidas_rapidas():
-    """Pantalla de carga masiva de bebidas con productos y cantidades rápidas."""
+    """Pantalla de carga masiva de bebidas asociadas a una estadía."""
     from core.dashboard import obtener_todos_pasajeros_habitacion
 
     if request.method == 'POST':
         habitacion = request.form.get('habitacion')
-        pasajero = request.form.get('pasajero')
+        id_estadia = request.form.get('id_estadia', '').strip()
         producto = request.form.get('producto')
         cantidad = request.form.get('cantidad', 1)
 
         try:
             habitacion = int(habitacion)
-        except Exception:
-            flash('❌ Habitación inválida', 'danger')
+        except (TypeError, ValueError):
+            flash('Habitación inválida', 'danger')
             return redirect('/bebidas-rapidas')
 
         habitaciones_ocupadas = obtener_habitaciones_ocupadas()
+
         if habitacion not in habitaciones_ocupadas:
-            flash('❌ La habitación no está ocupada', 'danger')
+            flash('La habitación no está ocupada', 'danger')
             return redirect('/bebidas-rapidas')
 
-        exito, mensaje = agregar_consumo_bebida_rapida(habitacion, producto, cantidad, pasajero)
-        flash(f'✅ {mensaje}' if exito else f'❌ {mensaje}', 'success' if exito else 'danger')
+        datos_estadia = validar_estadia_para_consumo(
+            id_estadia,
+            habitacion
+        )
+
+        if not datos_estadia:
+            flash('No se pudo validar la estadía seleccionada.', 'danger')
+            return redirect('/bebidas-rapidas')
+
+        exito, mensaje = agregar_consumo_bebida_rapida(
+            habitacion,
+            producto,
+            cantidad,
+            datos_estadia['pasajero'],
+            id_estadia=datos_estadia['id_estadia']
+        )
+
+        flash(mensaje, 'success' if exito else 'danger')
         return redirect('/bebidas-rapidas')
 
     habitaciones_ocupadas = obtener_habitaciones_ocupadas()
     habitaciones = []
+
     for num_habitacion in sorted(habitaciones_ocupadas.keys()):
         pasajeros = obtener_todos_pasajeros_habitacion(num_habitacion)
-        if not pasajeros:
-            pasajeros = [{'nombre': habitaciones_ocupadas[num_habitacion]['pasajero']}]
 
         habitaciones.append({
             'numero': num_habitacion,

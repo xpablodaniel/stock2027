@@ -273,17 +273,23 @@
 
             <div class="form-agregar-consumo">
                 <form action="/habitacion/{{ habitacion.numero }}/agregar-bebida" method="POST" id="form-bebida-rapida">
-                    {% if habitacion.cantidad_pasajeros > 1 %}
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">👤 Pasajero</label>
-                        <select name="pasajero" class="form-select" required>
-                            <option value="">Seleccionar pasajero...</option>
-                            {% for pasajero in habitacion.todos_pasajeros %}
-                            <option value="{{ pasajero.nombre }}">{{ pasajero.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% endif %}
+                        {% if habitacion.cantidad_pasajeros > 1 %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">👤 Pasajero</label>
+                            <select name="id_estadia" class="form-select" required>
+                                <option value="">Seleccionar pasajero...</option>
+                                {% for pasajero in habitacion.todos_pasajeros %}
+                                <option value="{{ pasajero.id_estadia }}">
+                                    {{ pasajero.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% else %}
+                        <input type="hidden"
+                            name="id_estadia"
+                            value="{{ habitacion.todos_pasajeros[0].id_estadia }}">
+                        {% endif %}
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Bebida</label>

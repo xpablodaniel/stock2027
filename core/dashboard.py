@@ -139,6 +139,7 @@ def obtener_habitaciones_ocupadas(archivo_pasajeros='data/pasajeros.csv'):
                 plazas_titular = 0
 
             habitaciones_ocupadas[num_hab] = {
+                'id_estadia': str(titular.get('id_estadia', '')).strip(),
                 'pasajero': titular['Apellido y nombre'],
                 'plazas': max(cantidad_pasajeros, plazas_titular),
                 'ingreso': titular['Fecha de ingreso'],
@@ -146,7 +147,7 @@ def obtener_habitaciones_ocupadas(archivo_pasajeros='data/pasajeros.csv'):
                 'servicios': titular['Servicios'],
                 'edad': int(titular.get('Edad', 0)),
                 'voucher': voucher
-            }
+}
     
     return habitaciones_ocupadas
 
@@ -191,6 +192,7 @@ def obtener_todos_pasajeros_habitacion(num_habitacion, archivo_pasajeros='data/p
         
         # Agregar pasajero a la lista
         pasajeros.append({
+            'id_estadia': str(row.get('id_estadia', '')).strip(),
             'nombre': row['Apellido y nombre'],
             'voucher': str(row.get('Voucher', '')).strip(),
             'edad': int(row.get('Edad', 0)),
