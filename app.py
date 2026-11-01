@@ -8,7 +8,12 @@ from core.informe_consumos import generar_consolidado_productos
 
 
 # Importar módulos del core
-from core.dashboard import obtener_datos_dashboard, obtener_habitaciones_ocupadas, extraer_num_hab
+from core.dashboard import (
+    obtener_datos_dashboard,
+    obtener_habitaciones_ocupadas,
+    extraer_num_hab,
+    obtener_listado_pasajeros_alojados
+)
 from core.consumos import (
     obtener_resumen_habitacion,
     agregar_consumo,
@@ -135,7 +140,22 @@ def dashboard():
                          estadisticas=datos['estadisticas'],
                          checkouts_hoy=datos['checkouts_hoy'])
 
+@app.route('/listado-pasajeros-alojados')
+def listado_pasajeros_alojados():
+    """Muestra el listado actualizado de pasajeros alojados."""
 
+    datos = obtener_listado_pasajeros_alojados(DB_PASAJEROS)
+
+    ahora = datetime.now()
+
+    return render_template(
+        'listado_pasajeros_alojados.html',
+        habitaciones=datos['habitaciones'],
+        total_habitaciones=datos['total_habitaciones'],
+        total_pasajeros=datos['total_pasajeros'],
+        fecha_emision=ahora.strftime('%d/%m/%Y'),
+        hora_emision=ahora.strftime('%H:%M')
+    )
 
 @app.route('/habitacion/<int:num_habitacion>')
 def ficha_habitacion(num_habitacion):
