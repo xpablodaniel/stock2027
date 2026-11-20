@@ -404,7 +404,13 @@ def exportar_control_cuentas():
 
     ahora = datetime.now()
     try:
-        datos = obtener_datos_control_cuentas(ahora.date())
+        # Permite probar una fecha concreta; sin parámetro se usa el día actual.
+        fecha_parametro = request.args.get('fecha', '').strip()
+        fecha_referencia = (
+            datetime.strptime(fecha_parametro, '%d/%m/%Y').date()
+            if fecha_parametro else ahora.date()
+        )
+        datos = obtener_datos_control_cuentas(fecha_referencia)
 
         # La nueva pestaña utiliza la misma fecha de referencia del libro.
         # Se vuelve a leer el padrón y los consumos sin modificar los archivos.
@@ -423,7 +429,7 @@ def exportar_control_cuentas():
                     tabla[columna] = ''
 
         consulta_salidas = generar_consulta_salidas(
-            pasajeros_consulta, consumos_consulta, ahora.date()
+            pasajeros_consulta, consumos_consulta, fecha_referencia
         )
 
         libro = Workbook()
