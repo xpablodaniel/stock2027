@@ -414,6 +414,14 @@ def exportar_control_cuentas():
         consumos_consulta = pd.read_csv(
             DB_CONSUMOS, dtype=str, keep_default_na=False, encoding='utf-8'
         )
+        for tabla, columnas in (
+            (pasajeros_consulta, COLUMNAS_PASAJEROS),
+            (consumos_consulta, COLUMNAS_CONSUMOS),
+        ):
+            for columna in columnas:
+                if columna not in tabla.columns:
+                    tabla[columna] = ''
+
         consulta_salidas = generar_consulta_salidas(
             pasajeros_consulta, consumos_consulta, ahora.date()
         )
