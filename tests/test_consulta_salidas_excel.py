@@ -63,7 +63,7 @@ class TestConsultaSalidasExcel(unittest.TestCase):
         self.assertEqual(libro.sheetnames, ["Resumen", "Detalle", "Consulta de salidas"])
         self.assertEqual(hoja["A2"].value, "Fecha de salida: 20/11/2026")
         self.assertEqual(hoja["F4"].value, 81500)
-        self.assertEqual(hoja["F15"].value, 8000)
+        self.assertEqual(hoja["F16"].value, 8000)
 
     def test_operaciones_quedan_agrupadas_y_ocultas(self):
         libro = Workbook()
