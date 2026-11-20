@@ -399,10 +399,25 @@ def exportar_control_cuentas():
     from openpyxl import Workbook
     from openpyxl.utils import get_column_letter
     from openpyxl.utils.exceptions import IllegalCharacterError
+    from core.consulta_salidas import generar_consulta_salidas
+    from core.consulta_salidas_excel import agregar_hoja_consulta_salidas
 
     ahora = datetime.now()
     try:
         datos = obtener_datos_control_cuentas(ahora.date())
+
+        # La nueva pestaña utiliza la misma fecha de referencia del libro.
+        # Se vuelve a leer el padrón y los consumos sin modificar los archivos.
+        pasajeros_consulta = pd.read_csv(
+            DB_PASAJEROS, dtype=str, keep_default_na=False, encoding='utf-8'
+        )
+        consumos_consulta = pd.read_csv(
+            DB_CONSUMOS, dtype=str, keep_default_na=False, encoding='utf-8'
+        )
+        consulta_salidas = generar_consulta_salidas(
+            pasajeros_consulta, consumos_consulta, ahora.date()
+        )
+
         libro = Workbook()
         resumen = libro.active
         resumen.title = 'Resumen'
@@ -443,6 +458,10 @@ def exportar_control_cuentas():
         detalle.auto_filter.ref = f'A1:M{detalle.max_row}'
         resumen.freeze_panes = 'A6'
         detalle.freeze_panes = 'A2'
+
+        # Añadir la consulta de salidas como tercera hoja del mismo libro.
+        agregar_hoja_consulta_salidas(libro, consulta_salidas)
+
         for hoja in (resumen, detalle):
             for columna in range(1, hoja.max_column + 1):
                 hoja.column_dimensions[get_column_letter(columna)].width = 22
