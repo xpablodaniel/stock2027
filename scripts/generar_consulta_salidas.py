@@ -28,9 +28,8 @@ def main():
     parser.add_argument("--pasajeros", type=Path, default=ROOT / "data/pasajeros.csv")
     parser.add_argument("--consumos", type=Path, default=ROOT / "data/consumos_diarios.csv")
     parser.add_argument(
-        "--salida", type=Path,
-        default=ROOT / "data/consultas_salidas" / f"consulta_salidas_{hoy:%Y%m%d}.json",
-        help="Ruta del JSON de destino."
+        "--salida", type=Path, default=None,
+        help="Ruta del JSON de destino (por defecto, data/consultas_salidas/consulta_salidas_AAAAMMDD.json)."
     )
     args = parser.parse_args()
 
@@ -57,15 +56,18 @@ def main():
                 )
 
         datos = generar_consulta_salidas(pasajeros, consumos, fecha)
-        args.salida.parent.mkdir(parents=True, exist_ok=True)
-        args.salida.write_text(
+        archivo_salida = args.salida or (
+            ROOT / "data/consultas_salidas" / f"consulta_salidas_{fecha:%Y%m%d}.json"
+        )
+        archivo_salida.parent.mkdir(parents=True, exist_ok=True)
+        archivo_salida.write_text(
             json.dumps(datos, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
     except (OSError, UnicodeError, pd.errors.ParserError, pd.errors.EmptyDataError, ValueError) as error:
         parser.error(f"No se pudo generar la consulta: {error}")
 
-    print(f"Consulta generada: {args.salida}")
+    print(f"Consulta generada: {archivo_salida}")
     print(f"Fecha de salida: {datos['fecha_salida']}")
     print(f"Cuentas: {datos['resumen']['cuentas']}")
     print(f"Habitaciones: {datos['resumen']['habitaciones']}")
