@@ -63,8 +63,8 @@ def agregar_hoja_consulta_salidas(libro, consulta):
         f"Habitaciones: {resumen.get('habitaciones', 0)}",
         f"Pasajeros: {resumen.get('pasajeros', 0)}",
         None,
-        None,
-        f"Total confirmado: {_numero(resumen.get('total_confirmado')) or 0}",
+        "Total confirmado",
+        _numero(resumen.get("total_confirmado")) or 0,
     ])
     hoja["F4"].number_format = '"$" #,##0.00'
     _fila(hoja, [])
